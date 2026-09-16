@@ -67,6 +67,7 @@ namespace ViewModelTests
             Assert.AreEqual(originalSettings.Properties.FancyzonesOpenWindowOnActiveMonitor.Value, viewModel.OpenWindowOnActiveMonitor);
             Assert.AreEqual(originalSettings.Properties.FancyzonesOverrideSnapHotkeys.Value, viewModel.OverrideSnapHotkeys);
             Assert.AreEqual(originalSettings.Properties.FancyzonesRestoreSize.Value, viewModel.RestoreSize);
+            Assert.AreEqual(originalSettings.Properties.FancyzonesLinkedResize.Value, viewModel.LinkedResize);
             Assert.AreEqual(originalSettings.Properties.FancyzonesShiftDrag.Value, viewModel.ShiftDrag);
             Assert.AreEqual(originalSettings.Properties.FancyzonesShowOnAllMonitors.Value, viewModel.ShowOnAllMonitors);
             Assert.AreEqual(originalSettings.Properties.FancyzonesSpanZonesAcrossMonitors.Value, viewModel.SpanZonesAcrossMonitors);
@@ -375,6 +376,50 @@ namespace ViewModelTests
             var expected = viewModel.RestoreSize;
             var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesRestoreSize.Value;
             Assert.AreEqual(expected, actual);
+        }
+
+        [TestMethod]
+        public void LinkedResizeShouldSetValue2FalseWhenSuccessful()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+
+            // arrange
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+            Assert.IsTrue(viewModel.LinkedResize); // check if value was initialized to true.
+
+            // act
+            viewModel.LinkedResize = false;
+
+            // assert
+            var expected = viewModel.LinkedResize;
+            var actual = SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesLinkedResize.Value;
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestMethod]
+        public void LinkedResizeShouldSerializeWithExpectedJsonName()
+        {
+            // arrange
+            var properties = new FZConfigProperties();
+
+            // act
+            var json = properties.ToJsonString();
+
+            // assert
+            using var doc = JsonDocument.Parse(json);
+            Assert.IsTrue(doc.RootElement.TryGetProperty("fancyzones_linkedResize", out var linkedResize));
+            Assert.IsTrue(linkedResize.GetProperty("value").GetBoolean());
+        }
+
+        [TestMethod]
+        public void LinkedResizeShouldDefaultToTrueWhenAbsentFromJson()
+        {
+            // act - deserialize settings that do not contain the new property
+            var properties = JsonSerializer.Deserialize<FZConfigProperties>("{}");
+
+            // assert
+            Assert.IsNotNull(properties.FancyzonesLinkedResize);
+            Assert.IsTrue(properties.FancyzonesLinkedResize.Value);
         }
 
         [TestMethod]

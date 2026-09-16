@@ -1576,6 +1576,13 @@ opera.exe</value>
   <data name="FancyZones_RestoreSize.Content" xml:space="preserve">
     <value>Restore the original size of windows when unsnapping</value>
   </data>
+  <data name="FancyZones_LinkedResize.Header" xml:space="preserve">
+    <value>Resize adjacent zoned windows together</value>
+  </data>
+  <data name="FancyZones_LinkedResize.Description" xml:space="preserve">
+    <value>Hold Alt to resize only the selected window</value>
+    <comment>Alt is a keyboard key</comment>
+  </data>
   <data name="ImageResizer_FallBackEncoderText.Header" xml:space="preserve">
     <value>Fallback encoder</value>
   </data>
