@@ -30,6 +30,7 @@
 #include <FancyZonesLib/trace.h>
 #include <FancyZonesLib/VirtualDesktop.h>
 #include <FancyZonesLib/WindowKeyboardSnap.h>
+#include <FancyZonesLib/WindowLinkedResize.h>
 #include <FancyZonesLib/WindowMouseSnap.h>
 #include <FancyZonesLib/WindowUtils.h>
 #include <FancyZonesLib/WorkArea.h>
@@ -217,7 +218,7 @@ struct FancyZones : public winrt::implements<FancyZones, IFancyZones, IFancyZone
 {
 public:
     FancyZones(HINSTANCE hinstance, std::function<void()> disableModuleCallbackFunction) noexcept :
-        SettingsObserver({ SettingId::EditorHotkey, SettingId::WindowSwitching, SettingId::PrevTabHotkey, SettingId::NextTabHotkey, SettingId::SpanZonesAcrossMonitors, SettingId::MonitorRotation, SettingId::MonitorRotationHotkey }),
+        SettingsObserver({ SettingId::EditorHotkey, SettingId::WindowSwitching, SettingId::PrevTabHotkey, SettingId::NextTabHotkey, SettingId::SpanZonesAcrossMonitors, SettingId::MonitorRotation, SettingId::MonitorRotationHotkey, SettingId::LinkedResizing }),
         m_hinstance(hinstance),
         m_draggingState([this]() {
             PostMessageW(m_window, WM_PRIV_LOCATIONCHANGE, NULL, NULL);
@@ -340,6 +341,7 @@ private:
 
     HWND m_window{};
     std::unique_ptr<WindowMouseSnap> m_windowMouseSnapper{};
+    std::unique_ptr<WindowLinkedResize> m_windowLinkedResize{};
     WindowKeyboardSnap m_windowKeyboardSnapper{};
     WorkAreaConfiguration m_workAreaConfiguration;
     DraggingState m_draggingState;
@@ -477,6 +479,7 @@ FancyZones::VirtualDesktopChanged() noexcept
 
 void FancyZones::MoveSizeStart(HWND window, HMONITOR monitor)
 {
+    m_windowLinkedResize = nullptr;
     m_windowMouseSnapper = WindowMouseSnap::Create(window, m_workAreaConfiguration.GetAllWorkAreas(), m_notificationUtil.get());
     if (m_windowMouseSnapper)
     {
@@ -488,6 +491,17 @@ void FancyZones::MoveSizeStart(HWND window, HMONITOR monitor)
         m_draggingState.Enable();
         m_draggingState.UpdateDraggingState();
         m_windowMouseSnapper->MoveSizeStart(monitor, m_draggingState.IsDragging());
+    }
+    else
+    {
+        // The snapper is not created while a resize cursor is active, so this is a
+        // resize gesture on a possibly zoned window. Holding Alt when the gesture
+        // becomes active latches independent (non-linked) resize for that gesture.
+        const bool independentResizeLatched = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+        if (FancyZonesSettings::settings().linkedResizing && !independentResizeLatched)
+        {
+            m_windowLinkedResize = WindowLinkedResize::Create(window, m_workAreaConfiguration.GetAllWorkAreas());
+        }
     }
 }
 
@@ -507,6 +521,12 @@ void FancyZones::MoveSizeUpdate(HMONITOR monitor, POINT const& ptScreen)
 
 void FancyZones::MoveSizeEnd()
 {
+    if (m_windowLinkedResize)
+    {
+        m_windowLinkedResize->End();
+        m_windowLinkedResize = nullptr;
+    }
+
     if (m_windowMouseSnapper)
     {
         m_windowMouseSnapper->MoveSizeEnd();
@@ -520,6 +540,12 @@ void FancyZones::MoveSizeEnd()
 
 void FancyZones::AbortMoveSize()
 {
+    if (m_windowLinkedResize)
+    {
+        m_windowLinkedResize->Cancel();
+        m_windowLinkedResize = nullptr;
+    }
+
     if (m_windowMouseSnapper)
     {
         m_windowMouseSnapper->Abort();
@@ -973,6 +999,10 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
         }
         else if (message == WM_PRIV_LOCATIONCHANGE)
         {
+            if (m_windowLinkedResize)
+            {
+                m_windowLinkedResize->Update(reinterpret_cast<HWND>(wparam));
+            }
             if (auto monitor = MonitorFromPoint(ptScreen, MONITOR_DEFAULTTONULL))
             {
                 MoveSizeUpdate(monitor, ptScreen);
@@ -992,6 +1022,11 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             if (m_windowMouseSnapper && m_windowMouseSnapper->GetDraggedWindow() == hwnd)
             {
                 Logger::info(L"Window destroyed during drag - aborting drag");
+                AbortMoveSize();
+            }
+            else if (m_windowLinkedResize && m_windowLinkedResize->GetResizedWindow() == hwnd)
+            {
+                Logger::info(L"Window destroyed during resize - aborting linked resize");
                 AbortMoveSize();
             }
         }
@@ -1590,6 +1625,16 @@ void FancyZones::SettingsUpdate(SettingId id)
         AbortMoveSize();
         m_workAreaConfiguration.Clear();
         PostMessageW(m_window, WM_PRIV_INIT, NULL, NULL);
+    }
+    break;
+    case SettingId::LinkedResizing:
+    {
+        // Disabling the setting mid-gesture restores independent resize.
+        if (!FancyZonesSettings::settings().linkedResizing && m_windowLinkedResize)
+        {
+            m_windowLinkedResize->Cancel();
+            m_windowLinkedResize = nullptr;
+        }
     }
     break;
     default:

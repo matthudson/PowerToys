@@ -17,6 +17,7 @@ public:
     FancyZonesDataTypes::ZoneSetLayoutType Type() const noexcept;
 
     const ZonesMap& Zones() const noexcept;
+    int Spacing() const noexcept;
     ZoneIndexSet ZonesFromPoint(POINT pt) const noexcept;
     /**
      * Returns all zones spanned by the minimum bounding rectangle containing the two given zone index sets.

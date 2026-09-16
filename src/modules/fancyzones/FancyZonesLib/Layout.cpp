@@ -183,6 +183,11 @@ const ZonesMap& Layout::Zones() const noexcept
     return m_zones;
 }
 
+int Layout::Spacing() const noexcept
+{
+    return m_data.showSpacing ? m_data.spacing : 0;
+}
+
 ZoneIndexSet Layout::ZonesFromPoint(POINT pt) const noexcept
 {
     ZoneIndexSet capturedZones;
