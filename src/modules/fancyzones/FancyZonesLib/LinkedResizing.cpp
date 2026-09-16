@@ -4,7 +4,7 @@
 namespace
 {
     // Positive when the intervals overlap; otherwise the negative distance between them.
-    LONG IntervalOverlapOrGap(LONG aStart, LONG aEnd, LONG bStart, LONG bEnd) noexcept
+    constexpr LONG IntervalOverlapOrGap(LONG aStart, LONG aEnd, LONG bStart, LONG bEnd) noexcept
     {
         if (bStart >= aEnd)
         {
@@ -22,7 +22,7 @@ namespace
     // True when the intervals overlap or are separated by at most maxGap. Used for the
     // axis perpendicular to a moved edge: a peer borders the resized window along that
     // edge when it faces it (overlap) or sits next to the moved corner (adjacent).
-    bool OverlapsOrAdjacent(LONG aStart, LONG aEnd, LONG bStart, LONG bEnd, int maxGap) noexcept
+    constexpr bool OverlapsOrAdjacent(LONG aStart, LONG aEnd, LONG bStart, LONG bEnd, int maxGap) noexcept
     {
         return IntervalOverlapOrGap(aStart, aEnd, bStart, bEnd) >= -maxGap;
     }
@@ -30,7 +30,7 @@ namespace
     // True when the gap between two facing edges keeps the windows directly bordering:
     // separated by at most maxGap, or overlapping by at most kBorderSlack (invisible
     // window borders make window rects overlap even when the frames touch).
-    bool EdgesAreAdjacent(LONG gap, int maxGap) noexcept
+    constexpr bool EdgesAreAdjacent(LONG gap, int maxGap) noexcept
     {
         return gap >= -LinkedResizing::kBorderSlack && gap <= maxGap;
     }
