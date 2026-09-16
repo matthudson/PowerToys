@@ -379,16 +379,16 @@ namespace ViewModelTests
         }
 
         [TestMethod]
-        public void LinkedResizeShouldSetValue2FalseWhenSuccessful()
+        public void LinkedResizeShouldSetValue2TrueWhenSuccessful()
         {
             Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
 
             // arrange
             FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
-            Assert.IsTrue(viewModel.LinkedResize); // check if value was initialized to true.
+            Assert.IsFalse(viewModel.LinkedResize); // check if value was initialized to false.
 
             // act
-            viewModel.LinkedResize = false;
+            viewModel.LinkedResize = true;
 
             // assert
             var expected = viewModel.LinkedResize;
@@ -408,18 +408,18 @@ namespace ViewModelTests
             // assert
             using var doc = JsonDocument.Parse(json);
             Assert.IsTrue(doc.RootElement.TryGetProperty("fancyzones_linkedResize", out var linkedResize));
-            Assert.IsTrue(linkedResize.GetProperty("value").GetBoolean());
+            Assert.IsFalse(linkedResize.GetProperty("value").GetBoolean());
         }
 
         [TestMethod]
-        public void LinkedResizeShouldDefaultToTrueWhenAbsentFromJson()
+        public void LinkedResizeShouldDefaultToFalseWhenAbsentFromJson()
         {
             // act - deserialize settings that do not contain the new property
             var properties = JsonSerializer.Deserialize<FZConfigProperties>("{}");
 
             // assert
             Assert.IsNotNull(properties.FancyzonesLinkedResize);
-            Assert.IsTrue(properties.FancyzonesLinkedResize.Value);
+            Assert.IsFalse(properties.FancyzonesLinkedResize.Value);
         }
 
         [TestMethod]

@@ -1577,10 +1577,10 @@ opera.exe</value>
     <value>Restore the original size of windows when unsnapping</value>
   </data>
   <data name="FancyZones_LinkedResize.Header" xml:space="preserve">
-    <value>Resize adjacent zoned windows together</value>
+    <value>Resize all windows in the same grid row or column together (Experimental)</value>
   </data>
   <data name="FancyZones_LinkedResize.Description" xml:space="preserve">
-    <value>Hold Alt to resize only the selected window</value>
+    <value>A normal resize adjusts the complete shared grid row or column and keeps the windows assigned to it aligned. Hold Alt when the resize starts to resize only that window without changing the layout.</value>
     <comment>Alt is a keyboard key</comment>
   </data>
   <data name="ImageResizer_FallBackEncoderText.Header" xml:space="preserve">
