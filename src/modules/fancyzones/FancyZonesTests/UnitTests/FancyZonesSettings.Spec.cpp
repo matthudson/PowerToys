@@ -85,7 +85,7 @@ namespace FancyZonesUnitTests
             values.add_property(L"fancyzones_show_on_all_monitors", m_defaultSettings.showZonesOnAllMonitors);
             values.add_property(L"fancyzones_multi_monitor_mode", m_defaultSettings.spanZonesAcrossMonitors);
             values.add_property(L"fancyzones_makeDraggedWindowTransparent", m_defaultSettings.makeDraggedWindowTransparent);
-            values.add_property(L"fancyzones_linkedResizing", m_defaultSettings.linkedResizing);
+            values.add_property(L"fancyzones_linkedResize", m_defaultSettings.linkedResizing);
             values.add_property(L"fancyzones_zoneColor", m_defaultSettings.zoneColor);
             values.add_property(L"fancyzones_zoneBorderColor", m_defaultSettings.zoneBorderColor);
             values.add_property(L"fancyzones_zoneHighlightColor", m_defaultSettings.zoneHighlightColor);
@@ -131,7 +131,7 @@ namespace FancyZonesUnitTests
             values.add_property(L"fancyzones_show_on_all_monitors", expected.showZonesOnAllMonitors);
             values.add_property(L"fancyzones_multi_monitor_mode", expected.spanZonesAcrossMonitors);
             values.add_property(L"fancyzones_makeDraggedWindowTransparent", expected.makeDraggedWindowTransparent);
-            values.add_property(L"fancyzones_linkedResizing", expected.linkedResizing);
+            values.add_property(L"fancyzones_linkedResize", expected.linkedResizing);
             values.add_property(L"fancyzones_zoneColor", expected.zoneColor);
             values.add_property(L"fancyzones_zoneBorderColor", expected.zoneBorderColor);
             values.add_property(L"fancyzones_zoneHighlightColor", expected.zoneHighlightColor);

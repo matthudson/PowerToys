@@ -35,7 +35,9 @@ namespace LinkedResizing
     // the resize gesture started, sameZone is true when the peer is assigned to the same
     // zone set as the resized window (stacked windows stay aligned), and maxEdgeGap is
     // the maximum separation between facing edges that still counts as directly
-    // bordering (configured zone spacing + kBorderSlack).
+    // bordering (the configured zone spacing; kBorderSlack only tolerates the
+    // small negative gap reported when invisible resize borders make touching
+    // frames overlap).
     // Returns nullopt when the peer is not linked to a moved edge or corner, or when the
     // resulting rectangle is not a valid target.
     std::optional<RECT> ComputeLinkedPeerRect(const RECT& draggedBefore, const RECT& draggedAfter, const RECT& peerBefore, bool sameZone, int maxEdgeGap) noexcept;

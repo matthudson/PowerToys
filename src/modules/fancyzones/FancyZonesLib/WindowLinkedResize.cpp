@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <common/logger/logger.h>
+#include <common/utils/elevation.h>
 #include <common/utils/winapi_error.h>
 
 #include <FancyZonesLib/Layout.h>
@@ -44,6 +45,15 @@ std::unique_ptr<WindowLinkedResize> WindowLinkedResize::Create(HWND window, cons
         return nullptr;
     }
 
+    // Same convention as WindowMouseSnap::Create: an unelevated FancyZones cannot
+    // control windows owned by elevated processes, so the session fails safe
+    // instead of moving peers while the resized window stays put.
+    const bool canMoveElevatedWindows = is_process_elevated();
+    if (!canMoveElevatedWindows && IsProcessOfWindowElevated(window))
+    {
+        return nullptr;
+    }
+
     RECT startRect{};
     if (!TryGetWindowRect(window, startRect))
     {
@@ -67,11 +77,14 @@ std::unique_ptr<WindowLinkedResize> WindowLinkedResize::Create(HWND window, cons
         const auto& layout = workArea->GetLayout();
         const int spacing = layout ? layout->Spacing() : 0;
 
-        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window, startRect, spacing + LinkedResizing::kBorderSlack));
+        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window, startRect, spacing));
 
         for (const auto& [peer, peerZones] : assignedWindows.SnappedWindows())
         {
-            if (peer == window || !IsResizablePeer(peer))
+            // Elevation of a live process cannot change mid-gesture, so checking
+            // it here keeps the per-event Update() path cheap.
+            if (peer == window || !IsResizablePeer(peer) ||
+                (!canMoveElevatedWindows && IsProcessOfWindowElevated(peer)))
             {
                 continue;
             }

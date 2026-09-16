@@ -492,11 +492,13 @@ void FancyZones::MoveSizeStart(HWND window, HMONITOR monitor)
         m_draggingState.UpdateDraggingState();
         m_windowMouseSnapper->MoveSizeStart(monitor, m_draggingState.IsDragging());
     }
-    else
+    else if (FancyZonesWindowUtils::IsCursorTypeIndicatingSizeEvent())
     {
-        // The snapper is not created while a resize cursor is active, so this is a
-        // resize gesture on a possibly zoned window. Holding Alt when the gesture
-        // becomes active latches independent (non-linked) resize for that gesture.
+        // WindowMouseSnap::Create also returns null for non-resize reasons (a
+        // plain move of an elevated or non-processable window), so only an
+        // active size cursor proves a resize gesture on a possibly zoned window.
+        // Holding Alt when the gesture becomes active latches independent
+        // (non-linked) resize for that gesture.
         const bool independentResizeLatched = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
         if (FancyZonesSettings::settings().linkedResizing && !independentResizeLatched)
         {

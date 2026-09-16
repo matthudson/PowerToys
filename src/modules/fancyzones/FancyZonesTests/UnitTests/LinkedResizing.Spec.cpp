@@ -14,8 +14,8 @@ namespace FancyZonesUnitTests
 {
     TEST_CLASS (LinkedResizingGeometryUnitTest)
     {
-        // Configured spacing of 16 + border slack, as WindowLinkedResize computes it.
-        static constexpr int kMaxEdgeGap = 16 + LinkedResizing::kBorderSlack;
+        // Configured spacing of 16, as WindowLinkedResize passes it.
+        static constexpr int kMaxEdgeGap = 16;
 
         TEST_METHOD (RightEdgeResizePullsNeighborLeftEdge)
         {
@@ -172,6 +172,52 @@ namespace FancyZonesUnitTests
             Assert::AreEqual<LONG>(16, secondTarget->left - secondDraggedAfter.right);
         }
 
+        TEST_METHOD (GapAtConfiguredSpacingIsLinked)
+        {
+            const RECT draggedBefore{ 0, 0, 100, 100 };
+            const RECT draggedAfter{ 0, 0, 130, 100 };
+            const RECT peerBefore{ 116, 0, 216, 100 }; // gap == configured spacing
+
+            const auto target = LinkedResizing::ComputeLinkedPeerRect(draggedBefore, draggedAfter, peerBefore, false, kMaxEdgeGap);
+
+            Assert::IsTrue(target.has_value());
+            CustomAssert::AreEqual(RECT{ 146, 0, 216, 100 }, target.value());
+        }
+
+        TEST_METHOD (GapBeyondConfiguredSpacingIsNotLinked)
+        {
+            const RECT draggedBefore{ 0, 0, 100, 100 };
+            const RECT draggedAfter{ 0, 0, 130, 100 };
+            const RECT peerBefore{ 117, 0, 217, 100 }; // gap == configured spacing + 1
+
+            const auto target = LinkedResizing::ComputeLinkedPeerRect(draggedBefore, draggedAfter, peerBefore, false, kMaxEdgeGap);
+
+            Assert::IsFalse(target.has_value());
+        }
+
+        TEST_METHOD (OverlapWithinBorderSlackIsLinked)
+        {
+            const RECT draggedBefore{ 0, 0, 100, 100 };
+            const RECT draggedAfter{ 0, 0, 130, 100 };
+            const RECT peerBefore{ 84, 0, 184, 100 }; // gap == -kBorderSlack
+
+            const auto target = LinkedResizing::ComputeLinkedPeerRect(draggedBefore, draggedAfter, peerBefore, false, kMaxEdgeGap);
+
+            Assert::IsTrue(target.has_value());
+            CustomAssert::AreEqual(RECT{ 114, 0, 184, 100 }, target.value());
+        }
+
+        TEST_METHOD (OverlapBeyondBorderSlackIsNotLinked)
+        {
+            const RECT draggedBefore{ 0, 0, 100, 100 };
+            const RECT draggedAfter{ 0, 0, 130, 100 };
+            const RECT peerBefore{ 83, 0, 183, 100 }; // gap == -kBorderSlack - 1
+
+            const auto target = LinkedResizing::ComputeLinkedPeerRect(draggedBefore, draggedAfter, peerBefore, false, kMaxEdgeGap);
+
+            Assert::IsFalse(target.has_value());
+        }
+
         TEST_METHOD (DetachedNeighborIsNotLinked)
         {
             const RECT draggedBefore{ 0, 0, 100, 100 };
@@ -303,7 +349,7 @@ namespace FancyZonesUnitTests
         TEST_METHOD (ParsesDisabledValue)
         {
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
-            values.add_property(L"fancyzones_linkedResizing", false);
+            values.add_property(L"fancyzones_linkedResize", false);
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
 
             FancyZonesSettings::instance().LoadSettings();
@@ -314,7 +360,7 @@ namespace FancyZonesUnitTests
         TEST_METHOD (ParsesEnabledValue)
         {
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
-            values.add_property(L"fancyzones_linkedResizing", true);
+            values.add_property(L"fancyzones_linkedResize", true);
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
 
             FancyZonesSettings::instance().LoadSettings();
@@ -326,6 +372,18 @@ namespace FancyZonesUnitTests
         {
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
             values.add_property(L"fancyzones_shiftDrag", true);
+            json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
+
+            FancyZonesSettings::instance().LoadSettings();
+
+            Assert::IsTrue(FancyZonesSettings::settings().linkedResizing);
+        }
+
+        TEST_METHOD (UnrelatedKeyKeepsEnabledDefault)
+        {
+            // Only the exact key emitted by the Settings UI is consumed.
+            PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
+            values.add_property(L"fancyzones_linkedResizing", false);
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
 
             FancyZonesSettings::instance().LoadSettings();

@@ -35,7 +35,7 @@ namespace NonLocalizable
     const wchar_t MakeDraggedWindowTransparentID[] = L"fancyzones_makeDraggedWindowTransparent";
     const wchar_t AllowChildWindowSnapID[] = L"fancyzones_allowChildWindowSnap";
     const wchar_t DisableRoundCornersOnSnapping[] = L"fancyzones_disableRoundCornersOnSnap";
-    const wchar_t LinkedResizingID[] = L"fancyzones_linkedResizing";
+    const wchar_t LinkedResizingID[] = L"fancyzones_linkedResize";
 
     const wchar_t SystemThemeID[] = L"fancyzones_systemTheme";
     const wchar_t ZoneColorID[] = L"fancyzones_zoneColor";
