@@ -60,6 +60,9 @@
     <ClCompile Include="LayoutAssignedWindows.Spec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LinkedResizing.Spec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="DefaultLayoutsTests.Spec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

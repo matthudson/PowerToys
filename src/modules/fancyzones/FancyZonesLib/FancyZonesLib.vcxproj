@@ -59,6 +59,7 @@
     <ClInclude Include="Layout.h" />
     <ClInclude Include="LayoutConfigurator.h" />
     <ClInclude Include="LayoutAssignedWindows.h" />
+    <ClInclude Include="LinkedResizing.h" />
     <ClInclude Include="ModuleConstants.h" />
     <ClInclude Include="MonitorUtils.h" />
     <ClInclude Include="WorkAreaConfiguration.h" />
@@ -73,6 +74,7 @@
     <ClInclude Include="util.h" />
     <ClInclude Include="VirtualDesktop.h" />
     <ClInclude Include="WindowKeyboardSnap.h" />
+    <ClInclude Include="WindowLinkedResize.h" />
     <ClInclude Include="WindowMouseSnap.h" />
     <ClInclude Include="FancyZonesWindowProperties.h" />
     <ClInclude Include="WindowUtils.h" />
@@ -119,6 +121,7 @@
     <ClCompile Include="Layout.cpp" />
     <ClCompile Include="LayoutConfigurator.cpp" />
     <ClCompile Include="LayoutAssignedWindows.cpp" />
+    <ClCompile Include="LinkedResizing.cpp" />
     <ClCompile Include="MonitorUtils.cpp" />
     <ClCompile Include="WorkAreaConfiguration.cpp" />
     <ClCompile Include="OnThreadExecutor.cpp" />
@@ -131,6 +134,7 @@
     <ClCompile Include="util.cpp" />
     <ClCompile Include="VirtualDesktop.cpp" />
     <ClCompile Include="WindowKeyboardSnap.cpp" />
+    <ClCompile Include="WindowLinkedResize.cpp" />
     <ClCompile Include="WindowMouseSnap.cpp" />
     <ClCompile Include="WindowUtils.cpp" />
     <ClCompile Include="Zone.cpp" />
