@@ -63,6 +63,9 @@
     <ClCompile Include="LinkedResizing.Spec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GridTracks.Spec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="DefaultLayoutsTests.Spec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

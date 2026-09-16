@@ -51,6 +51,7 @@
     <ClInclude Include="FancyZonesWinHookEventIDs.h" />
     <ClInclude Include="GenericKeyHook.h" />
     <ClInclude Include="FancyZonesData.h" />
+    <ClInclude Include="GridTracks.h" />
     <ClInclude Include="GuidUtils.h" />
     <ClInclude Include="JsonHelpers.h" />
     <ClInclude Include="KeyboardInput.h" />
@@ -113,6 +114,7 @@
     <ClCompile Include="FancyZonesWindowProperties.cpp" />
     <ClCompile Include="FancyZonesWinHookEventIDs.cpp" />
     <ClCompile Include="FancyZonesData.cpp" />
+    <ClCompile Include="GridTracks.cpp" />
     <ClCompile Include="JsonHelpers.cpp" />
     <ClCompile Include="FancyZonesData\LayoutHotkeys.cpp">
       <PrecompiledHeaderFile>../pch.h</PrecompiledHeaderFile>

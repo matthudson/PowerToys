@@ -87,6 +87,9 @@
     <ClInclude Include="FancyZonesWindowProperties.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GridTracks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="GuidUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -285,6 +288,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="LinkedResizing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GridTracks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FancyZonesData\LastUsedVirtualDesktop.cpp">
