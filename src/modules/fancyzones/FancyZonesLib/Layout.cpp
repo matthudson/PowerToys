@@ -188,6 +188,25 @@ int Layout::Spacing() const noexcept
     return m_data.showSpacing ? m_data.spacing : 0;
 }
 
+bool Layout::ReplaceZones(ZonesMap zones) noexcept
+{
+    if (zones.size() != m_zones.size())
+    {
+        return false;
+    }
+
+    for (const auto& [zoneId, zone] : zones)
+    {
+        if (!m_zones.contains(zoneId) || zone.Id() != zoneId || !zone.IsValid())
+        {
+            return false;
+        }
+    }
+
+    m_zones = std::move(zones);
+    return true;
+}
+
 ZoneIndexSet Layout::ZonesFromPoint(POINT pt) const noexcept
 {
     ZoneIndexSet capturedZones;
@@ -321,14 +340,19 @@ ZoneIndexSet Layout::GetCombinedZoneRange(const ZoneIndexSet& initialZones, cons
 
 RECT Layout::GetCombinedZonesRect(const ZoneIndexSet& zones)
 {
+    return CombinedZonesRect(m_zones, zones);
+}
+
+RECT Layout::CombinedZonesRect(const ZonesMap& zones, const ZoneIndexSet& indexSet)
+{
     RECT size{};
     bool sizeEmpty = true;
 
-    for (ZoneIndex id : zones)
+    for (ZoneIndex id : indexSet)
     {
-        if (m_zones.contains(id))
+        if (zones.contains(id))
         {
-            const auto& zone = m_zones.at(id);
+            const auto& zone = zones.at(id);
             const RECT newSize = zone.GetZoneRect();
             if (!sizeEmpty)
             {

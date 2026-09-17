@@ -3,6 +3,7 @@
 
 #include <filesystem>
 
+#include <FancyZonesLib/GridTracks.h>
 #include <FancyZonesLib/LinkedResizing.h>
 #include <FancyZonesLib/ModuleConstants.h>
 #include <FancyZonesLib/Settings.h>
@@ -328,6 +329,136 @@ namespace FancyZonesUnitTests
         }
     };
 
+    TEST_CLASS (LinkedResizingBoundarySelectionUnitTest)
+    {
+        static constexpr LONG kGap = 16;
+
+        static void AssertMove(const LinkedResizing::BoundaryMove& move, bool horizontal, LONG coordinate, LONG delta)
+        {
+            Assert::AreEqual(horizontal, move.horizontal);
+            Assert::AreEqual<LONG>(coordinate, move.coordinate);
+            Assert::AreEqual<LONG>(delta, move.delta);
+        }
+
+        TEST_METHOD (RightEdgeDragMovesCombinedRightBoundary)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .right = 40 }, RECT{ 0, 0, 100, 100 }, kGap);
+
+            Assert::AreEqual<size_t>(1, moves.size());
+            AssertMove(moves[0], false, 100, 40);
+        }
+
+        TEST_METHOD (LeftEdgeDragMovesFacingBoundary)
+        {
+            // The zone left edge at 116 faces the boundary line at 116 - gap.
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .left = -20 }, RECT{ 116, 0, 216, 100 }, kGap);
+
+            Assert::AreEqual<size_t>(1, moves.size());
+            AssertMove(moves[0], false, 100, -20);
+        }
+
+        TEST_METHOD (BottomEdgeDragMovesCombinedBottomBoundary)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .bottom = -15 }, RECT{ 0, 0, 100, 100 }, kGap);
+
+            Assert::AreEqual<size_t>(1, moves.size());
+            AssertMove(moves[0], true, 100, -15);
+        }
+
+        TEST_METHOD (TopEdgeDragMovesFacingBoundary)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .top = 30 }, RECT{ 0, 116, 100, 216 }, kGap);
+
+            Assert::AreEqual<size_t>(1, moves.size());
+            AssertMove(moves[0], true, 100, 30);
+        }
+
+        TEST_METHOD (CornerDragSelectsBothTracks)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .right = 40, .bottom = 30 }, RECT{ 0, 0, 100, 100 }, kGap);
+
+            Assert::AreEqual<size_t>(2, moves.size());
+            AssertMove(moves[0], false, 100, 40);
+            AssertMove(moves[1], true, 100, 30);
+        }
+
+        TEST_METHOD (UnequalOppositeEdgeDeltasSelectBothBoundaries)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .left = 10, .right = -5 }, RECT{ 116, 0, 216, 100 }, kGap);
+
+            Assert::AreEqual<size_t>(2, moves.size());
+            AssertMove(moves[0], false, 100, 10);
+            AssertMove(moves[1], false, 216, -5);
+        }
+
+        TEST_METHOD (PlainMoveSelectsNoBoundaries)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .left = 12, .top = 8, .right = 12, .bottom = 8 }, RECT{ 0, 0, 100, 100 }, kGap);
+
+            Assert::IsTrue(moves.empty());
+        }
+
+        TEST_METHOD (NoEdgeMotionSelectsNoBoundaries)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{}, RECT{ 0, 0, 100, 100 }, kGap);
+
+            Assert::IsTrue(moves.empty());
+        }
+
+        TEST_METHOD (ZeroGapLeftEdgeDragUsesCombinedLeft)
+        {
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .left = 10 }, RECT{ 100, 0, 200, 100 }, 0);
+
+            Assert::AreEqual<size_t>(1, moves.size());
+            AssertMove(moves[0], false, 100, 10);
+        }
+
+        TEST_METHOD (SelectedMoveTracksTheDraggedZoneRightEdge)
+        {
+            // Two columns separated by the gap; the resized window fills the
+            // left zone, so its right edge rests on the boundary's low line.
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 116, 0, 216, 100 }, 1));
+
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .right = 40 }, zones.at(0).GetZoneRect(), kGap);
+            Assert::AreEqual<size_t>(1, moves.size());
+
+            const auto moved = GridTracks::MoveVerticalBoundary(zones, moves[0].coordinate, moves[0].delta, kGap, 0);
+            Assert::IsTrue(moved.has_value());
+            CustomAssert::AreEqual(RECT{ 0, 0, 140, 100 }, moved->at(0).GetZoneRect());
+            CustomAssert::AreEqual(RECT{ 156, 0, 216, 100 }, moved->at(1).GetZoneRect());
+        }
+
+        TEST_METHOD (SelectedMoveTracksTheDraggedZoneLeftEdge)
+        {
+            // Same columns; dragging the right zone's left edge moves the
+            // facing boundary one gap below the combined left edge.
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 116, 0, 216, 100 }, 1));
+
+            const auto moves = LinkedResizing::SelectBoundaryMoves(
+                LinkedResizing::EdgeDeltas{ .left = 20 }, zones.at(1).GetZoneRect(), kGap);
+            Assert::AreEqual<size_t>(1, moves.size());
+
+            const auto moved = GridTracks::MoveVerticalBoundary(zones, moves[0].coordinate, moves[0].delta, kGap, 0);
+            Assert::IsTrue(moved.has_value());
+            CustomAssert::AreEqual(RECT{ 0, 0, 120, 100 }, moved->at(0).GetZoneRect());
+            CustomAssert::AreEqual(RECT{ 136, 0, 216, 100 }, moved->at(1).GetZoneRect());
+        }
+    };
+
     TEST_CLASS (LinkedResizingSettingsUnitTest)
     {
         TEST_METHOD_INITIALIZE(Init)
@@ -341,9 +472,9 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().SetSettings(Settings{});
         }
 
-        TEST_METHOD (DefaultIsEnabled)
+        TEST_METHOD (DefaultIsDisabled)
         {
-            Assert::IsTrue(Settings{}.linkedResizing);
+            Assert::IsFalse(Settings{}.linkedResizing);
         }
 
         TEST_METHOD (ParsesDisabledValue)
@@ -368,7 +499,7 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(FancyZonesSettings::settings().linkedResizing);
         }
 
-        TEST_METHOD (MissingValueKeepsEnabledDefault)
+        TEST_METHOD (MissingValueKeepsDisabledDefault)
         {
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
             values.add_property(L"fancyzones_shiftDrag", true);
@@ -376,19 +507,19 @@ namespace FancyZonesUnitTests
 
             FancyZonesSettings::instance().LoadSettings();
 
-            Assert::IsTrue(FancyZonesSettings::settings().linkedResizing);
+            Assert::IsFalse(FancyZonesSettings::settings().linkedResizing);
         }
 
-        TEST_METHOD (UnrelatedKeyKeepsEnabledDefault)
+        TEST_METHOD (UnrelatedKeyKeepsDisabledDefault)
         {
             // Only the exact key emitted by the Settings UI is consumed.
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
-            values.add_property(L"fancyzones_linkedResizing", false);
+            values.add_property(L"fancyzones_linkedResizing", true);
             json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
 
             FancyZonesSettings::instance().LoadSettings();
 
-            Assert::IsTrue(FancyZonesSettings::settings().linkedResizing);
+            Assert::IsFalse(FancyZonesSettings::settings().linkedResizing);
         }
     };
 }
