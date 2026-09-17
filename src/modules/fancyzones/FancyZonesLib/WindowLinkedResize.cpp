@@ -14,8 +14,10 @@
 
 namespace
 {
-    // Boundary moves only require the moved zones to keep a positive extent.
-    constexpr LONG kMinZoneExtent = 0;
+    // Keep both zones and the grid tracks they may span large enough to remain
+    // visible and draggable. GridTracks still permits an already-smaller track
+    // to move in the direction that repairs it.
+    constexpr LONG kMinZoneExtent = 32;
 
     bool TryGetWindowRect(HWND window, RECT& rect) noexcept
     {
