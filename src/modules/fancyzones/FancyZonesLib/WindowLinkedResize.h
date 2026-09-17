@@ -56,6 +56,13 @@ private:
     // The layout captured when the gesture started, or null when the work
     // area's Layout object was replaced mid-gesture.
     Layout* CurrentLayout() const noexcept;
+
+    // Persists the adjusted topology of an applied custom grid layout so a
+    // reopened editor and a restarted FancyZones see the same grid. Other
+    // layout types keep the in-memory linked-resize result only; a failed
+    // conversion or an unavailable layout writes nothing.
+    void PersistAdjustedLayout(Layout& layout) noexcept;
+
     void Release() noexcept;
 
     HWND m_window{};

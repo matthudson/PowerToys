@@ -188,6 +188,29 @@ int Layout::Spacing() const noexcept
     return m_data.showSpacing ? m_data.spacing : 0;
 }
 
+int Layout::TrackSpacing() const noexcept
+{
+    const int spacing = Spacing();
+    const auto gridSpacing = [spacing]() { return (spacing / 2) * 2; };
+
+    if (m_data.type == FancyZonesDataTypes::ZoneSetLayoutType::Grid ||
+        m_data.type == FancyZonesDataTypes::ZoneSetLayoutType::PriorityGrid)
+    {
+        return gridSpacing();
+    }
+
+    if (m_data.type == FancyZonesDataTypes::ZoneSetLayoutType::Custom)
+    {
+        const auto customLayout = CustomLayouts::instance().GetCustomLayoutData(m_data.uuid);
+        if (customLayout.has_value() && customLayout->type == FancyZonesDataTypes::CustomLayoutType::Grid)
+        {
+            return gridSpacing();
+        }
+    }
+
+    return spacing;
+}
+
 bool Layout::ReplaceZones(ZonesMap zones) noexcept
 {
     if (zones.size() != m_zones.size())

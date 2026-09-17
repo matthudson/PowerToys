@@ -8,8 +8,6 @@
 
 namespace
 {
-    constexpr int C_MULTIPLIER = 10000;
-
     // PriorityGrid layout is unique for zoneCount <= 11. For zoneCount > 11 PriorityGrid is same as Grid
     FancyZonesDataTypes::GridLayoutInfo predefinedPriorityGridLayouts[11] = {
         /* 1 */
@@ -124,18 +122,18 @@ ZonesMap CalculateGridZones(FancyZonesUtils::Rect workArea, FancyZonesDataTypes:
     int totalPercents = 0;
     for (int row = 0; row < gridLayoutInfo.rows(); row++)
     {
-        rowInfo[row].Start = totalPercents * totalHeight / C_MULTIPLIER;
+        rowInfo[row].Start = totalPercents * totalHeight / LayoutConfigurator::C_MULTIPLIER;
         totalPercents += gridLayoutInfo.rowsPercents()[row];
-        rowInfo[row].End = totalPercents * totalHeight / C_MULTIPLIER;
+        rowInfo[row].End = totalPercents * totalHeight / LayoutConfigurator::C_MULTIPLIER;
         rowInfo[row].Extent = rowInfo[row].End - rowInfo[row].Start;
     }
 
     totalPercents = 0;
     for (int col = 0; col < gridLayoutInfo.columns(); col++)
     {
-        columnInfo[col].Start = totalPercents * totalWidth / C_MULTIPLIER;
+        columnInfo[col].Start = totalPercents * totalWidth / LayoutConfigurator::C_MULTIPLIER;
         totalPercents += gridLayoutInfo.columnsPercents()[col];
-        columnInfo[col].End = totalPercents * totalWidth / C_MULTIPLIER;
+        columnInfo[col].End = totalPercents * totalWidth / LayoutConfigurator::C_MULTIPLIER;
         columnInfo[col].Extent = columnInfo[col].End - columnInfo[col].Start;
     }
 
@@ -445,4 +443,256 @@ ZonesMap LayoutConfigurator::Custom(FancyZonesUtils::Rect workArea, HMONITOR mon
     }
 
     return {};
+}
+
+std::optional<LayoutConfigurator::GridTrackPercents> LayoutConfigurator::DeriveGridTrackPercents(const ZonesMap& zones, const FancyZonesDataTypes::GridLayoutInfo& gridLayoutInfo, FancyZonesUtils::Rect workArea, int spacing) noexcept
+{
+    const int rows = gridLayoutInfo.rows();
+    const int columns = gridLayoutInfo.columns();
+    const std::vector<int>& rowsPercents = gridLayoutInfo.rowsPercents();
+    const std::vector<int>& columnsPercents = gridLayoutInfo.columnsPercents();
+    const std::vector<std::vector<int>>& cellChildMap = gridLayoutInfo.cellChildMap();
+    const int64_t totalWidth = workArea.width();
+    const int64_t totalHeight = workArea.height();
+
+    const auto validPercents = [](const std::vector<int>& percents, int tracks) {
+        if (static_cast<int>(percents.size()) != tracks)
+        {
+            return false;
+        }
+
+        int64_t sum = 0;
+        for (const int percent : percents)
+        {
+            if (percent <= 0)
+            {
+                return false;
+            }
+            sum += percent;
+        }
+
+        return sum == C_MULTIPLIER;
+    };
+
+    if (rows <= 0 || columns <= 0 || totalWidth <= 0 || totalHeight <= 0 ||
+        !validPercents(rowsPercents, rows) || !validPercents(columnsPercents, columns) ||
+        static_cast<int>(cellChildMap.size()) != rows)
+    {
+        return std::nullopt;
+    }
+
+    // Per-zone cell span, recovered by walking the cell-child map the same way
+    // CalculateGridZones does: a zone's top-left cell is one where neither the
+    // cell above nor the cell to the left belongs to the same zone.
+    struct CellSpan
+    {
+        int row{};
+        int col{};
+        int maxRow{};
+        int maxCol{};
+    };
+
+    std::map<ZoneIndex, CellSpan> spans;
+    for (int row = 0; row < rows; ++row)
+    {
+        if (static_cast<int>(cellChildMap[row].size()) != columns)
+        {
+            return std::nullopt;
+        }
+
+        for (int col = 0; col < columns; ++col)
+        {
+            const int id = cellChildMap[row][col];
+            if (id < 0)
+            {
+                return std::nullopt;
+            }
+
+            const bool isZoneStart = (row == 0 || cellChildMap[static_cast<size_t>(row) - 1][col] != id) &&
+                                     (col == 0 || cellChildMap[row][static_cast<size_t>(col) - 1] != id);
+            if (!isZoneStart)
+            {
+                continue;
+            }
+
+            if (spans.contains(id))
+            {
+                // Disconnected cells of one id are not a rectangular zone.
+                return std::nullopt;
+            }
+
+            CellSpan span{ .row = row, .col = col, .maxRow = row, .maxCol = col };
+            while (static_cast<int64_t>(span.maxRow) + 1 < rows && cellChildMap[static_cast<size_t>(span.maxRow) + 1][col] == id)
+            {
+                ++span.maxRow;
+            }
+            while (static_cast<int64_t>(span.maxCol) + 1 < columns && cellChildMap[row][static_cast<size_t>(span.maxCol) + 1] == id)
+            {
+                ++span.maxCol;
+            }
+
+            spans.emplace(id, span);
+        }
+    }
+
+    // The zones map and the cell-child map must describe the same zone set.
+    if (spans.size() != zones.size())
+    {
+        return std::nullopt;
+    }
+
+    for (const auto& [id, span] : spans)
+    {
+        const auto zone = zones.find(id);
+        if (zone == zones.end() || !zone->second.IsValid())
+        {
+            return std::nullopt;
+        }
+    }
+
+    // Every cell must be covered by its zone's span: a cell outside of it means
+    // the zone is not rectangular and cannot be reproduced.
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int col = 0; col < columns; ++col)
+        {
+            const CellSpan& span = spans.at(cellChildMap[row][col]);
+            if (row < span.row || row > span.maxRow || col < span.col || col > span.maxCol)
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    const auto cumulativeOf = [](const std::vector<int>& percents) {
+        std::vector<int64_t> cumulative(percents.size() + 1, 0);
+        for (size_t i = 0; i < percents.size(); ++i)
+        {
+            cumulative[i + 1] = cumulative[i] + percents[i];
+        }
+        return cumulative;
+    };
+
+    // For each internal grid line recover its position from the final zone
+    // rectangles: a zone ending on the line has its leading edge spacing/2
+    // below it, a zone starting on it has its trailing edge spacing/2 above.
+    // Every visible segment of one line must agree; a line with no visible
+    // segment keeps its original cumulative boundary.
+    const auto deriveCumulative = [&](bool horizontal, int tracks, int64_t totalExtent, const std::vector<int64_t>& original) -> std::optional<std::vector<int64_t>> {
+        std::vector<int64_t> cumulative(static_cast<size_t>(tracks) + 1);
+        cumulative[0] = 0;
+        cumulative[tracks] = C_MULTIPLIER;
+
+        for (int boundary = 1; boundary < tracks; ++boundary)
+        {
+            std::optional<int64_t> position;
+            const auto merge = [&position](int64_t candidate) {
+                if (position.has_value())
+                {
+                    return *position == candidate;
+                }
+                position = candidate;
+                return true;
+            };
+
+            for (const auto& [id, span] : spans)
+            {
+                const RECT rect = zones.at(id).GetZoneRect();
+                const int spanStart = horizontal ? span.row : span.col;
+                const int spanEnd = horizontal ? span.maxRow : span.maxCol;
+                const LONG trailing = horizontal ? rect.top : rect.left;
+                const LONG leading = horizontal ? rect.bottom : rect.right;
+
+                if (spanEnd == boundary - 1 && !merge(static_cast<int64_t>(leading) + static_cast<int64_t>(spacing) / 2))
+                {
+                    return std::nullopt;
+                }
+                if (spanStart == boundary && !merge(static_cast<int64_t>(trailing) - static_cast<int64_t>(spacing) / 2))
+                {
+                    return std::nullopt;
+                }
+            }
+
+            if (!position.has_value())
+            {
+                cumulative[boundary] = original[boundary];
+                continue;
+            }
+
+            // Prefer the original cumulative boundary when it reproduces the
+            // same pixel line; otherwise take the smallest cumulative that
+            // truncates to the observed position.
+            if (original[boundary] * totalExtent / C_MULTIPLIER == *position)
+            {
+                cumulative[boundary] = original[boundary];
+            }
+            else
+            {
+                cumulative[boundary] = (*position * C_MULTIPLIER + totalExtent - 1) / totalExtent;
+            }
+        }
+
+        return cumulative;
+    };
+
+    const auto rowCumulative = deriveCumulative(true, rows, totalHeight, cumulativeOf(rowsPercents));
+    const auto columnCumulative = deriveCumulative(false, columns, totalWidth, cumulativeOf(columnsPercents));
+    if (!rowCumulative.has_value() || !columnCumulative.has_value())
+    {
+        return std::nullopt;
+    }
+
+    // Strictly increasing cumulative boundaries keep every track positive and
+    // the vector sum exactly C_MULTIPLIER.
+    const auto toPercents = [](const std::vector<int64_t>& cumulative) -> std::optional<std::vector<int>> {
+        std::vector<int> percents(cumulative.size() - 1);
+        for (size_t i = 0; i < percents.size(); ++i)
+        {
+            const int64_t percent = cumulative[i + 1] - cumulative[i];
+            if (percent <= 0 || percent > C_MULTIPLIER)
+            {
+                return std::nullopt;
+            }
+            percents[i] = static_cast<int>(percent);
+        }
+        return percents;
+    };
+
+    const auto derivedRows = toPercents(*rowCumulative);
+    const auto derivedColumns = toPercents(*columnCumulative);
+    if (!derivedRows.has_value() || !derivedColumns.has_value())
+    {
+        return std::nullopt;
+    }
+
+    // The derived vectors must reproduce the effective zones map exactly;
+    // anything else is an invalid conversion and must not be persisted.
+    FancyZonesDataTypes::GridLayoutInfo updated(gridLayoutInfo);
+    updated.m_rowsPercents = *derivedRows;
+    updated.m_columnsPercents = *derivedColumns;
+
+    const ZonesMap recomputed = CalculateGridZones(workArea, updated, spacing);
+    if (recomputed.size() != zones.size())
+    {
+        return std::nullopt;
+    }
+
+    for (const auto& [id, zone] : zones)
+    {
+        const auto iter = recomputed.find(id);
+        if (iter == recomputed.end())
+        {
+            return std::nullopt;
+        }
+
+        const RECT expected = zone.GetZoneRect();
+        const RECT actual = iter->second.GetZoneRect();
+        if (expected.left != actual.left || expected.top != actual.top ||
+            expected.right != actual.right || expected.bottom != actual.bottom)
+        {
+            return std::nullopt;
+        }
+    }
+
+    return GridTrackPercents{ .rowsPercents = *derivedRows, .columnsPercents = *derivedColumns };
 }
