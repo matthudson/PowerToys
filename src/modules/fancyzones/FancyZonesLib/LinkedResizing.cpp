@@ -114,3 +114,41 @@ std::optional<RECT> LinkedResizing::ComputeLinkedPeerRect(const RECT& draggedBef
 
     return target;
 }
+
+std::vector<LinkedResizing::BoundaryMove> LinkedResizing::SelectBoundaryMoves(const EdgeDeltas& deltas, const RECT& combinedZonesRect, LONG gap) noexcept
+{
+    std::vector<BoundaryMove> moves;
+
+    // Opposite edges translating together mean a plain move, which must not
+    // mutate the layout. Otherwise every moved edge drags the shared boundary
+    // its combined zone edge rests on: left/top edges sit on the facing line
+    // `gap` above the boundary's low line, right/bottom edges rest on the low
+    // line itself.
+    if (deltas.left != deltas.right)
+    {
+        if (deltas.left != 0)
+        {
+            moves.push_back(BoundaryMove{ .horizontal = false, .coordinate = combinedZonesRect.left - gap, .delta = deltas.left });
+        }
+
+        if (deltas.right != 0)
+        {
+            moves.push_back(BoundaryMove{ .horizontal = false, .coordinate = combinedZonesRect.right, .delta = deltas.right });
+        }
+    }
+
+    if (deltas.top != deltas.bottom)
+    {
+        if (deltas.top != 0)
+        {
+            moves.push_back(BoundaryMove{ .horizontal = true, .coordinate = combinedZonesRect.top - gap, .delta = deltas.top });
+        }
+
+        if (deltas.bottom != 0)
+        {
+            moves.push_back(BoundaryMove{ .horizontal = true, .coordinate = combinedZonesRect.bottom, .delta = deltas.bottom });
+        }
+    }
+
+    return moves;
+}

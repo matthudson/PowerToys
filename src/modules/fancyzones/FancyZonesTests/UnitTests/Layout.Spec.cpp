@@ -183,6 +183,124 @@ namespace FancyZonesUnitTests
             Zone zone3({ 0, 100, 100, 200 }, 2);
             compareZones(zone3, layout->Zones().at(actual[1]));
         }
+
+        TEST_METHOD (ReplaceZonesAcceptsSameIdsAndCount)
+        {
+            m_layout->Init(RECT{ 0, 0, 1920, 1080 }, Mocks::Monitor());
+            const ZonesMap original = m_layout->Zones();
+
+            ZonesMap replacement;
+            for (const auto& [id, zone] : original)
+            {
+                RECT rect = zone.GetZoneRect();
+                rect.left += 7;
+                rect.bottom -= 3;
+                replacement.emplace(id, Zone(rect, id));
+            }
+
+            Assert::IsTrue(m_layout->ReplaceZones(replacement));
+            Assert::AreEqual(original.size(), m_layout->Zones().size());
+            for (const auto& [id, zone] : original)
+            {
+                const RECT expected = zone.GetZoneRect();
+                const RECT actual = m_layout->Zones().at(id).GetZoneRect();
+                Assert::AreEqual<LONG>(expected.left + 7, actual.left);
+                Assert::AreEqual<LONG>(expected.bottom - 3, actual.bottom);
+                Assert::AreEqual<ZoneIndex>(id, m_layout->Zones().at(id).Id());
+            }
+        }
+
+        TEST_METHOD (ReplaceZonesRejectsDifferentCount)
+        {
+            m_layout->Init(RECT{ 0, 0, 1920, 1080 }, Mocks::Monitor());
+            const ZonesMap original = m_layout->Zones();
+
+            ZonesMap replacement = original;
+            replacement.emplace(99, Zone(RECT{ 0, 0, 10, 10 }, 99));
+
+            Assert::IsFalse(m_layout->ReplaceZones(replacement));
+            Assert::AreEqual(original.size(), m_layout->Zones().size());
+            Assert::IsFalse(m_layout->Zones().contains(99));
+        }
+
+        TEST_METHOD (ReplaceZonesRejectsUnknownIds)
+        {
+            m_layout->Init(RECT{ 0, 0, 1920, 1080 }, Mocks::Monitor());
+            const ZonesMap original = m_layout->Zones();
+
+            ZonesMap replacement;
+            for (const auto& [id, zone] : original)
+            {
+                replacement.emplace(id + 100, Zone(zone.GetZoneRect(), id + 100));
+            }
+
+            Assert::IsFalse(m_layout->ReplaceZones(replacement));
+            for (const auto& [id, zone] : original)
+            {
+                CustomAssert::AreEqual(zone.GetZoneRect(), m_layout->Zones().at(id).GetZoneRect());
+            }
+        }
+
+        TEST_METHOD (ReplaceZonesRejectsMismatchedZoneId)
+        {
+            m_layout->Init(RECT{ 0, 0, 1920, 1080 }, Mocks::Monitor());
+            const ZonesMap original = m_layout->Zones();
+
+            ZonesMap replacement;
+            for (const auto& [id, zone] : original)
+            {
+                // The map key must agree with the zone's own id.
+                replacement.emplace(id, Zone(zone.GetZoneRect(), id + 1));
+            }
+
+            Assert::IsFalse(m_layout->ReplaceZones(replacement));
+            for (const auto& [id, zone] : original)
+            {
+                CustomAssert::AreEqual(zone.GetZoneRect(), m_layout->Zones().at(id).GetZoneRect());
+            }
+        }
+
+        TEST_METHOD (ReplaceZonesRejectsInvalidZone)
+        {
+            m_layout->Init(RECT{ 0, 0, 1920, 1080 }, Mocks::Monitor());
+            const ZonesMap original = m_layout->Zones();
+
+            ZonesMap replacement;
+            for (const auto& [id, zone] : original)
+            {
+                RECT rect = zone.GetZoneRect();
+                if (id == original.begin()->first)
+                {
+                    // A right edge left of the left edge is not a valid zone.
+                    rect.left = rect.right + 1;
+                }
+                replacement.emplace(id, Zone(rect, id));
+            }
+
+            Assert::IsFalse(m_layout->ReplaceZones(replacement));
+            Assert::AreEqual(original.size(), m_layout->Zones().size());
+            for (const auto& [id, zone] : original)
+            {
+                CustomAssert::AreEqual(zone.GetZoneRect(), m_layout->Zones().at(id).GetZoneRect());
+            }
+        }
+
+        TEST_METHOD (CombinedZonesRectReadsProspectiveMap)
+        {
+            // Peer targets are computed against a prospective moved map before
+            // it is installed, so the helper must not depend on a live layout.
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 116, 0, 216, 100 }, 1));
+
+            CustomAssert::AreEqual(RECT{ 0, 0, 216, 100 }, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 0, 1 }));
+            CustomAssert::AreEqual(RECT{ 116, 0, 216, 100 }, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 1 }));
+
+            // Ids missing from the map are skipped; an unknown-only set yields
+            // an empty rect.
+            CustomAssert::AreEqual(RECT{ 116, 0, 216, 100 }, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 1, 42 }));
+            CustomAssert::AreEqual(RECT{}, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 42 }));
+        }
     };
 
     TEST_CLASS (LayoutInitUnitTests)
