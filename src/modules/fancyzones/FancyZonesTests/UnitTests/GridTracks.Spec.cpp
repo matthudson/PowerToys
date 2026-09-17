@@ -197,6 +197,42 @@ namespace FancyZonesUnitTests
             Assert::IsFalse(GridTracks::MoveVerticalBoundary(BrokenCutGrid(), kTrackX, 250, kGap, 50).has_value());
         }
 
+        TEST_METHOD (MinimumParallelTrackWidthIsEnforcedWhenZonesSpanTracks)
+        {
+            // The two cuts exist in separate horizontal sections, so no zone
+            // occupies only the 40px track between them.
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 100, 0, 300, 100 }, 1));
+            zones.emplace(2, Zone(RECT{ 0, 100, 140, 200 }, 2));
+            zones.emplace(3, Zone(RECT{ 140, 100, 300, 200 }, 3));
+
+            Assert::IsFalse(GridTracks::MoveVerticalBoundary(zones, 100, 10, 0, 32).has_value());
+        }
+
+        TEST_METHOD (UndersizedParallelTrackCanMoveOnlyTowardRecovery)
+        {
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 100, 0, 300, 100 }, 1));
+            zones.emplace(2, Zone(RECT{ 0, 100, 120, 200 }, 2));
+            zones.emplace(3, Zone(RECT{ 120, 100, 300, 200 }, 3));
+
+            Assert::IsTrue(GridTracks::MoveVerticalBoundary(zones, 100, -5, 0, 32).has_value());
+            Assert::IsFalse(GridTracks::MoveVerticalBoundary(zones, 100, 5, 0, 32).has_value());
+        }
+
+        TEST_METHOD (BoundaryCannotJumpAcrossAnotherParallelTrack)
+        {
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 100, 0, 300, 100 }, 1));
+            zones.emplace(2, Zone(RECT{ 0, 100, 120, 200 }, 2));
+            zones.emplace(3, Zone(RECT{ 120, 100, 300, 200 }, 3));
+
+            Assert::IsFalse(GridTracks::MoveVerticalBoundary(zones, 100, 80, 0, 1).has_value());
+        }
+
         TEST_METHOD (NonPositiveTargetIsRejected)
         {
             // Moving the boundary up 300px collapses zones 0/2 (bottom would be -58).

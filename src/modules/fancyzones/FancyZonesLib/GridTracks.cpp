@@ -22,12 +22,65 @@ namespace
         return edge > lo && edge < hi;
     }
 
+    // A zone can span several grid tracks, so checking zone extents alone does
+    // not prevent two parallel cuts from being squeezed into a tiny, unusable
+    // track. Keep the moving cut on the same side of every other cut and at
+    // least minExtent away. If the loaded layout is already undersized, allow
+    // movement only when it increases the deficient separation so the layout
+    // can be repaired interactively.
+    bool HasValidTrackSeparation(const ZonesMap& zones, bool horizontal, const BoundaryLines& lines, LONG delta, LONG minExtent) noexcept
+    {
+        if (delta == 0)
+        {
+            return true;
+        }
+
+        const LONG targetLow = lines.low + delta;
+        const LONG targetHigh = lines.high + delta;
+
+        const auto validAgainst = [minExtent](LONG current, LONG target, LONG other) noexcept {
+            if (other == current)
+            {
+                return true;
+            }
+
+            const int64_t currentOffset = static_cast<int64_t>(current) - other;
+            const int64_t targetOffset = static_cast<int64_t>(target) - other;
+            if ((currentOffset < 0 && targetOffset >= 0) || (currentOffset > 0 && targetOffset <= 0))
+            {
+                return false; // do not cross or collapse another grid cut
+            }
+
+            const int64_t currentDistance = currentOffset < 0 ? -currentOffset : currentOffset;
+            const int64_t targetDistance = targetOffset < 0 ? -targetOffset : targetOffset;
+            return currentDistance < minExtent ? targetDistance > currentDistance : targetDistance >= minExtent;
+        };
+
+        for (const auto& [_, zone] : zones)
+        {
+            const RECT rect = zone.GetZoneRect();
+            const LONG leading = horizontal ? rect.bottom : rect.right;
+            const LONG trailing = horizontal ? rect.top : rect.left;
+            if (!validAgainst(lines.low, targetLow, leading) || !validAgainst(lines.high, targetHigh, trailing))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     std::optional<ZonesMap> MoveBoundary(const ZonesMap& zones, bool horizontal, LONG coordinate, LONG delta, LONG gap, LONG minExtent) noexcept
     {
         const BoundaryLines lines{ coordinate, coordinate + gap };
         const LONG targetLow = lines.low + delta;
         const LONG targetHigh = lines.high + delta;
         const LONG minRequired = minExtent > 0 ? minExtent : 1;
+
+        if (!HasValidTrackSeparation(zones, horizontal, lines, delta, minRequired))
+        {
+            return std::nullopt;
+        }
 
         ZonesMap moved;
         size_t lowEdges = 0;
@@ -78,7 +131,9 @@ namespace
             if (onLow || onHigh)
             {
                 const LONG extent = horizontal ? updated.bottom - updated.top : updated.right - updated.left;
-                if (updated.right <= updated.left || updated.bottom <= updated.top || extent < minRequired)
+                const LONG priorExtent = horizontal ? rect.bottom - rect.top : rect.right - rect.left;
+                const bool extentIsValid = priorExtent < minRequired ? extent > priorExtent : extent >= minRequired;
+                if (updated.right <= updated.left || updated.bottom <= updated.top || !extentIsValid)
                 {
                     return std::nullopt;
                 }

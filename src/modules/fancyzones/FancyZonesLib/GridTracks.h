@@ -31,8 +31,9 @@ namespace GridTracks
     // present on only one side, e.g. an ambiguous outer edge of the map), when
     // stray zone edges make the boundary ambiguous (an edge resting on the
     // opposite boundary line or floating inside the gap band), or when the move
-    // would produce a non-positive zone rect or shrink a moved zone below
-    // minHeight.
+    // would produce a non-positive zone rect, shrink a moved zone below
+    // minHeight, or place this cut closer than minHeight to another parallel
+    // cut. An already-undersized zone or cut may move only toward recovery.
     std::optional<ZonesMap> MoveHorizontalBoundary(const ZonesMap& zones, LONG boundaryY, LONG deltaY, LONG gap, LONG minHeight) noexcept;
 
     // Symmetric vertical variant: every zone right at boundaryX and every zone
