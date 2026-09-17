@@ -6,6 +6,7 @@
 #include <FancyZonesLib/FancyZonesData/LayoutDefaults.h>
 #include <FancyZonesLib/FancyZonesWinHookEventIDs.h>
 #include <FancyZonesLib/JsonHelpers.h>
+#include <FancyZonesLib/LayoutConfigurator.h>
 #include <FancyZonesLib/util.h>
 
 namespace JsonUtils
@@ -262,4 +263,69 @@ std::optional<FancyZonesDataTypes::CustomLayoutData> CustomLayouts::GetCustomLay
 const CustomLayouts::TCustomLayoutMap& CustomLayouts::GetAllLayouts() const noexcept
 {
     return m_layouts;
+}
+
+bool CustomLayouts::SetGridLayoutTrackPercents(const GUID& id, const std::vector<int>& rowsPercents, const std::vector<int>& columnsPercents) noexcept
+{
+    try
+    {
+        const auto validPercents = [](const std::vector<int>& percents, int tracks) {
+            if (static_cast<int>(percents.size()) != tracks)
+            {
+                return false;
+            }
+
+            int64_t sum = 0;
+            for (const int percent : percents)
+            {
+                if (percent <= 0)
+                {
+                    return false;
+                }
+                sum += percent;
+            }
+
+            return sum == LayoutConfigurator::C_MULTIPLIER;
+        };
+
+        const auto iter = m_layouts.find(id);
+        if (iter == m_layouts.end() || iter->second.type != FancyZonesDataTypes::CustomLayoutType::Grid ||
+            !std::holds_alternative<FancyZonesDataTypes::GridLayoutInfo>(iter->second.info))
+        {
+            return false;
+        }
+
+        FancyZonesDataTypes::CustomLayoutData updated = iter->second;
+        auto& gridInfo = std::get<FancyZonesDataTypes::GridLayoutInfo>(updated.info);
+        if (!validPercents(rowsPercents, gridInfo.rows()) || !validPercents(columnsPercents, gridInfo.columns()))
+        {
+            return false;
+        }
+
+        gridInfo.m_rowsPercents = rowsPercents;
+        gridInfo.m_columnsPercents = columnsPercents;
+
+        // Serialize the complete map through the shared writer so every
+        // unrelated layout is preserved; the file watcher reloads
+        // custom-layouts.json and refreshes the applied work areas.
+        JSONHelpers::TCustomZoneSetsMap serialized;
+        for (const auto& [layoutId, data] : m_layouts)
+        {
+            const auto uuid = FancyZonesUtils::GuidToString(layoutId);
+            if (!uuid.has_value())
+            {
+                return false;
+            }
+
+            serialized[uuid.value()] = (layoutId == id) ? updated : data;
+        }
+
+        JSONHelpers::SaveCustomLayouts(serialized);
+        iter->second = std::move(updated);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }

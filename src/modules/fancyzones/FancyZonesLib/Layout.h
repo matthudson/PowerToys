@@ -18,6 +18,7 @@ public:
 
     const ZonesMap& Zones() const noexcept;
     int Spacing() const noexcept;
+    int TrackSpacing() const noexcept;
     /**
      * Atomically replaces the effective zones map, e.g. with a boundary-moved
      * map produced by GridTracks during a linked-resize gesture. Accepted only

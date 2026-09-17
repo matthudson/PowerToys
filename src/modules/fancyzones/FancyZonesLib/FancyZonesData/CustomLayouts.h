@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include <FancyZonesLib/FancyZonesData/LayoutData.h>
 #include <FancyZonesLib/FancyZonesDataTypes.h>
@@ -68,6 +69,16 @@ public:
     std::optional<LayoutData> GetLayout(const GUID& id) const noexcept;
     std::optional<FancyZonesDataTypes::CustomLayoutData> GetCustomLayoutData(const GUID& id) const noexcept;
     const TCustomLayoutMap& GetAllLayouts() const noexcept;
+
+    /**
+     * Updates the row/column track percentages of a stored custom grid layout
+     * in memory and serializes the complete layout map back to
+     * custom-layouts.json, preserving every unrelated layout. Returns false
+     * without writing anything when the layout is missing or is not a grid, or
+     * when a vector does not hold exactly `tracks` positive entries summing to
+     * LayoutConfigurator::C_MULTIPLIER.
+     */
+    bool SetGridLayoutTrackPercents(const GUID& id, const std::vector<int>& rowsPercents, const std::vector<int>& columnsPercents) noexcept;
 
 private:
     CustomLayouts();

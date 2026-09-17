@@ -5,6 +5,7 @@
 #include <common/utils/elevation.h>
 #include <common/utils/winapi_error.h>
 
+#include <FancyZonesLib/FancyZonesData/CustomLayouts.h>
 #include <FancyZonesLib/GridTracks.h>
 #include <FancyZonesLib/Layout.h>
 #include <FancyZonesLib/LinkedResizing.h>
@@ -99,7 +100,7 @@ std::unique_ptr<WindowLinkedResize> WindowLinkedResize::Create(HWND window, cons
             continue;
         }
 
-        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window, startRect, workArea.get(), layout.get(), windowZones, layout->Zones(), layout->Spacing()));
+        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window, startRect, workArea.get(), layout.get(), windowZones, layout->Zones(), layout->TrackSpacing()));
 
         for (const auto& [peer, peerZones] : assignedWindows.SnappedWindows())
         {
@@ -308,14 +309,21 @@ void WindowLinkedResize::End() noexcept
     // layout even if the final requested move was rejected.
     if (m_layoutChanged)
     {
-        if (Layout* layout = CurrentLayout(); layout && IsWindow(m_window))
+        if (Layout* layout = CurrentLayout())
         {
-            const RECT target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(m_window, layout->GetCombinedZonesRect(m_windowZones), m_workArea->GetWorkAreaWindow());
-            RECT current{};
-            if (LinkedResizing::IsValidTargetRect(target) && GetWindowRect(m_window, &current) && !EqualRect(&current, &target))
+            if (IsWindow(m_window))
             {
-                ApplyRect(m_window, target);
+                const RECT target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(m_window, layout->GetCombinedZonesRect(m_windowZones), m_workArea->GetWorkAreaWindow());
+                RECT current{};
+                if (LinkedResizing::IsValidTargetRect(target) && GetWindowRect(m_window, &current) && !EqualRect(&current, &target))
+                {
+                    ApplyRect(m_window, target);
+                }
             }
+
+            // A successfully completed gesture also persists the adjusted
+            // topology of an applied custom grid layout.
+            PersistAdjustedLayout(*layout);
         }
     }
 
@@ -343,6 +351,39 @@ void WindowLinkedResize::Cancel() noexcept
     }
 
     Release();
+}
+
+void WindowLinkedResize::PersistAdjustedLayout(Layout& layout) noexcept
+{
+    try
+    {
+        // Only an applied custom grid layout has a persisted topology to
+        // update; every other layout type keeps the in-memory linked-resize
+        // result.
+        if (layout.Type() != FancyZonesDataTypes::ZoneSetLayoutType::Custom || !m_workArea)
+        {
+            return;
+        }
+
+        const auto customLayout = CustomLayouts::instance().GetCustomLayoutData(layout.Id());
+        if (!customLayout.has_value() || customLayout->type != FancyZonesDataTypes::CustomLayoutType::Grid ||
+            !std::holds_alternative<FancyZonesDataTypes::GridLayoutInfo>(customLayout->info))
+        {
+            return;
+        }
+
+        const auto& gridInfo = std::get<FancyZonesDataTypes::GridLayoutInfo>(customLayout->info);
+        const auto percents = LayoutConfigurator::DeriveGridTrackPercents(layout.Zones(), gridInfo, m_workArea->GetWorkAreaRect(), layout.Spacing());
+        if (!percents.has_value() ||
+            !CustomLayouts::instance().SetGridLayoutTrackPercents(layout.Id(), percents->rowsPercents, percents->columnsPercents))
+        {
+            Logger::error(L"Linked resize: failed to persist the adjusted custom grid layout");
+        }
+    }
+    catch (...)
+    {
+        Logger::error(L"Linked resize: failed to persist the adjusted custom grid layout");
+    }
 }
 
 void WindowLinkedResize::Release() noexcept

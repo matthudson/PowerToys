@@ -88,6 +88,20 @@ namespace FancyZonesUnitTests
             CustomAssert::AreEqual(m_layout->Type(), m_data.type);
         }
 
+        TEST_METHOD (GridTrackSpacingUsesTheEffectiveEvenGap)
+        {
+            Assert::AreEqual(16, m_layout->TrackSpacing());
+        }
+
+        TEST_METHOD (RowsTrackSpacingKeepsTheConfiguredGap)
+        {
+            LayoutData data = m_data;
+            data.type = ZoneSetLayoutType::Rows;
+            auto layout = std::make_unique<Layout>(data);
+
+            Assert::AreEqual(17, layout->TrackSpacing());
+        }
+
         TEST_METHOD (EmptyZones)
         {
             auto zones = m_layout->Zones();
