@@ -132,15 +132,24 @@ void FancyZonesApp::HandleWinHookEvent(WinHookEvent* data) noexcept
     case EVENT_SYSTEM_MOVESIZESTART:
     {
         fzCallback->HandleWinHookEvent(data);
+        // Re-arm the transient location hook for every gesture. A graphics
+        // watchdog or shell interruption can lose MOVESIZEEND and leave a
+        // non-null but stale hook handle behind.
+        if (m_objectLocationWinEventHook)
+        {
+            UnhookWinEvent(m_objectLocationWinEventHook);
+            m_objectLocationWinEventHook = nullptr;
+        }
+        m_objectLocationWinEventHook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE,
+                                                       EVENT_OBJECT_LOCATIONCHANGE,
+                                                       nullptr,
+                                                       WinHookProc,
+                                                       0,
+                                                       0,
+                                                       WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
         if (!m_objectLocationWinEventHook)
         {
-            m_objectLocationWinEventHook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE,
-                                                           EVENT_OBJECT_LOCATIONCHANGE,
-                                                           nullptr,
-                                                           WinHookProc,
-                                                           0,
-                                                           0,
-                                                           WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+            Logger::error(L"Failed to re-arm the move-size location hook, {}", GetLastError());
         }
     }
     break;

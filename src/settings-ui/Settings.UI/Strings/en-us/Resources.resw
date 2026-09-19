@@ -1583,6 +1583,12 @@ opera.exe</value>
     <value>A normal resize adjusts the complete shared grid row or column and keeps the windows assigned to it aligned. Hold Alt when the resize starts to resize only that window without changing the layout.</value>
     <comment>Alt is a keyboard key</comment>
   </data>
+  <data name="FancyZones_LinkedResizePreview.Header" xml:space="preserve">
+    <value>Preview linked resizing and apply windows on release (Experimental)</value>
+  </data>
+  <data name="FancyZones_LinkedResizePreview.Description" xml:space="preserve">
+    <value>Show the proposed zones while resizing, then move affected windows together when the resize ends. This can improve performance for complex layouts and video windows.</value>
+  </data>
   <data name="ImageResizer_FallBackEncoderText.Header" xml:space="preserve">
     <value>Fallback encoder</value>
   </data>

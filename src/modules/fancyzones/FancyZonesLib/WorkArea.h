@@ -54,6 +54,7 @@ public:
     bool Unsnap(HWND window);
 
     void ShowZones(const ZoneIndexSet& highlight, HWND draggedWindow = nullptr);
+    void ShowZonesPreview(const ZonesMap& zones, const ZoneIndexSet& highlight, HWND draggedWindow = nullptr);
     void HideZones();
     void FlashZones();
     void ShowMonitorRotationPreview(const std::vector<RECT>& windowRects, size_t monitorNumber, std::optional<bool> reverse, bool animateRotation);

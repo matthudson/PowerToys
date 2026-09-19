@@ -47,6 +47,7 @@ struct Settings
     bool allowSnapChildWindows = false;
     bool disableRoundCorners = false;
     bool linkedResizing = false;
+    bool linkedResizePreview = false;
     std::wstring zoneColor = L"#AACDFF";
     std::wstring zoneBorderColor = L"#FFFFFF";
     std::wstring zoneHighlightColor = L"#008CFF";

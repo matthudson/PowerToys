@@ -150,6 +150,11 @@ bool WorkArea::Snap(HWND window, const ZoneIndexSet& zones, bool updatePosition)
         FancyZonesWindowUtils::SizeWindowToRect(window, adjustedRect);
     }
 
+    // Query the application's tracking constraints once the snap has placed
+    // it on its final monitor/DPI. Linked resize consumes this cached value and
+    // never sends synchronous constraint messages from the resize hot path.
+    m_layoutWindows.RefreshWindowSizeConstraints(window);
+
     return FancyZonesWindowProperties::StampZoneIndexProperty(window, zones);
 }
 
@@ -183,6 +188,16 @@ void WorkArea::ShowZones(const ZoneIndexSet& highlight, HWND draggedWindow/* = n
     {
         SetWorkAreaWindowAsTopmost(draggedWindow);
         m_zonesOverlay->DrawActiveZoneSet(m_layout->Zones(), highlight, Colors::GetZoneColors(), FancyZonesSettings::settings().showZoneNumber);
+        m_zonesOverlay->Show();
+    }
+}
+
+void WorkArea::ShowZonesPreview(const ZonesMap& zones, const ZoneIndexSet& highlight, HWND draggedWindow/* = nullptr*/)
+{
+    if (m_zonesOverlay)
+    {
+        SetWorkAreaWindowAsTopmost(draggedWindow);
+        m_zonesOverlay->DrawActiveZoneSet(zones, highlight, Colors::GetZoneColors(), FancyZonesSettings::settings().showZoneNumber);
         m_zonesOverlay->Show();
     }
 }

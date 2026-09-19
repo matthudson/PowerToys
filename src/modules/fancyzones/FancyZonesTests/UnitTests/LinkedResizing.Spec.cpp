@@ -5,6 +5,7 @@
 
 #include <FancyZonesLib/GridTracks.h>
 #include <FancyZonesLib/LinkedResizing.h>
+#include <FancyZonesLib/LayoutAssignedWindows.h>
 #include <FancyZonesLib/ModuleConstants.h>
 #include <FancyZonesLib/Settings.h>
 #include <common/SettingsAPI/settings_helpers.h>
@@ -475,6 +476,7 @@ namespace FancyZonesUnitTests
         TEST_METHOD (DefaultIsDisabled)
         {
             Assert::IsFalse(Settings{}.linkedResizing);
+            Assert::IsFalse(Settings{}.linkedResizePreview);
         }
 
         TEST_METHOD (ParsesDisabledValue)
@@ -499,6 +501,18 @@ namespace FancyZonesUnitTests
             Assert::IsTrue(FancyZonesSettings::settings().linkedResizing);
         }
 
+        TEST_METHOD (ParsesPreviewModeIndependently)
+        {
+            PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
+            values.add_property(L"fancyzones_linkedResizePreview", true);
+            json::to_file(FancyZonesSettings::GetSettingsFileName(), values.get_raw_json());
+
+            FancyZonesSettings::instance().LoadSettings();
+
+            Assert::IsTrue(FancyZonesSettings::settings().linkedResizePreview);
+            Assert::IsFalse(FancyZonesSettings::settings().linkedResizing);
+        }
+
         TEST_METHOD (MissingValueKeepsDisabledDefault)
         {
             PowerToysSettings::PowerToyValues values(NonLocalizable::ModuleKey, NonLocalizable::ModuleKey);
@@ -520,6 +534,32 @@ namespace FancyZonesUnitTests
             FancyZonesSettings::instance().LoadSettings();
 
             Assert::IsFalse(FancyZonesSettings::settings().linkedResizing);
+        }
+    };
+
+    TEST_CLASS (LinkedResizeWindowConstraintsUnitTest)
+    {
+        TEST_METHOD (CombinedMultiZoneFootprintUsesOuterWindowSize)
+        {
+            const WindowSizeConstraints constraints{
+                .minimumTrackSize = { 400, 250 },
+                .maximumTrackSize = { 1600, 1200 },
+            };
+
+            Assert::IsTrue(constraints.Allows(RECT{ 0, 0, 900, 600 }));
+            Assert::IsFalse(constraints.Allows(RECT{ 0, 0, 399, 600 }));
+            Assert::IsFalse(constraints.Allows(RECT{ 0, 0, 900, 249 }));
+        }
+
+        TEST_METHOD (MaximumConstraintIsAppliedWhenKnown)
+        {
+            const WindowSizeConstraints constraints{
+                .minimumTrackSize = { 100, 100 },
+                .maximumTrackSize = { 800, 600 },
+            };
+
+            Assert::IsTrue(constraints.Allows(RECT{ 0, 0, 800, 600 }));
+            Assert::IsFalse(constraints.Allows(RECT{ 0, 0, 801, 600 }));
         }
     };
 }

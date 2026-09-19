@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <FancyZonesLib/LayoutConfigurator.h> // ZonesMap
+#include <FancyZonesLib/LayoutAssignedWindows.h> // WindowSizeConstraints
 #include <FancyZonesLib/LinkedResizing.h> // EdgeDeltas
 
 class Layout;
@@ -22,7 +23,7 @@ class WorkArea;
 // gesture, and rolls everything back on cancel.
 class WindowLinkedResize
 {
-    WindowLinkedResize(HWND window, const RECT& startRect, WorkArea* workArea, Layout* layout, ZoneIndexSet windowZones, const ZonesMap& startZones, int gap);
+    WindowLinkedResize(HWND window, const RECT& startRect, WorkArea* workArea, Layout* layout, ZoneIndexSet windowZones, const ZonesMap& startZones, int gap, bool previewMode);
 
 public:
     static std::unique_ptr<WindowLinkedResize> Create(HWND window, const std::unordered_map<HMONITOR, std::unique_ptr<WorkArea>>& activeWorkAreas);
@@ -51,6 +52,7 @@ private:
         ZoneIndexSet zones{};   // assigned zone set; unchanged by the gesture
         RECT startRect{};       // window rect captured when the gesture started
         RECT appliedRect{};     // last rect applied through SetWindowPos
+        std::optional<WindowSizeConstraints> constraints{};
     };
 
     // The layout captured when the gesture started, or null when the work
@@ -63,6 +65,10 @@ private:
     // conversion or an unavailable layout writes nothing.
     void PersistAdjustedLayout(Layout& layout) noexcept;
 
+    // Applies a deferred preview as one batched window-position transaction.
+    // Any rejected target restores every window and the original zone map.
+    bool CommitPreview(Layout& layout) noexcept;
+
     void Release() noexcept;
 
     HWND m_window{};
@@ -72,7 +78,10 @@ private:
     ZoneIndexSet m_windowZones{};
     ZonesMap m_startZones{}; // effective zones map captured when the gesture started
     const int m_gap{};
+    const bool m_previewMode{};
     std::vector<Peer> m_peers{};
+    std::optional<WindowSizeConstraints> m_windowConstraints{};
+    std::optional<ZonesMap> m_previewZones{};
     LinkedResizing::EdgeDeltas m_appliedDeltas{}; // cumulative edge deltas already folded into the layout
     bool m_layoutChanged{ false }; // at least one step committed a moved grid track to the effective layout
     bool m_updating{ false }; // reentrancy guard while applying peer positions

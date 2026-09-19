@@ -68,6 +68,7 @@ namespace ViewModelTests
             Assert.AreEqual(originalSettings.Properties.FancyzonesOverrideSnapHotkeys.Value, viewModel.OverrideSnapHotkeys);
             Assert.AreEqual(originalSettings.Properties.FancyzonesRestoreSize.Value, viewModel.RestoreSize);
             Assert.AreEqual(originalSettings.Properties.FancyzonesLinkedResize.Value, viewModel.LinkedResize);
+            Assert.AreEqual(originalSettings.Properties.FancyzonesLinkedResizePreview.Value, viewModel.LinkedResizePreview);
             Assert.AreEqual(originalSettings.Properties.FancyzonesShiftDrag.Value, viewModel.ShiftDrag);
             Assert.AreEqual(originalSettings.Properties.FancyzonesShowOnAllMonitors.Value, viewModel.ShowOnAllMonitors);
             Assert.AreEqual(originalSettings.Properties.FancyzonesSpanZonesAcrossMonitors.Value, viewModel.SpanZonesAcrossMonitors);
@@ -420,6 +421,33 @@ namespace ViewModelTests
             // assert
             Assert.IsNotNull(properties.FancyzonesLinkedResize);
             Assert.IsFalse(properties.FancyzonesLinkedResize.Value);
+        }
+
+        [TestMethod]
+        public void LinkedResizePreviewShouldSetValueTrueWhenSuccessful()
+        {
+            Mock<SettingsUtils> mockSettingsUtils = new Mock<SettingsUtils>(new FileSystem(), null);
+            FancyZonesViewModel viewModel = new FancyZonesViewModel(mockSettingsUtils.Object, SettingsRepository<GeneralSettings>.GetInstance(mockGeneralSettingsUtils.Object), SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object), sendMockIPCConfigMSG, FancyZonesTestFolderName);
+
+            Assert.IsFalse(viewModel.LinkedResizePreview);
+            Assert.IsFalse(viewModel.LinkedResizePreviewAvailable);
+
+            viewModel.LinkedResize = true;
+            viewModel.LinkedResizePreview = true;
+
+            Assert.IsTrue(viewModel.LinkedResizePreviewAvailable);
+            Assert.IsTrue(SettingsRepository<FancyZonesSettings>.GetInstance(mockFancyZonesSettingsUtils.Object).SettingsConfig.Properties.FancyzonesLinkedResizePreview.Value);
+        }
+
+        [TestMethod]
+        public void LinkedResizePreviewShouldSerializeWithExpectedJsonName()
+        {
+            var properties = new FZConfigProperties();
+            var json = properties.ToJsonString();
+
+            using var doc = JsonDocument.Parse(json);
+            Assert.IsTrue(doc.RootElement.TryGetProperty("fancyzones_linkedResizePreview", out var preview));
+            Assert.IsFalse(preview.GetProperty("value").GetBoolean());
         }
 
         [TestMethod]

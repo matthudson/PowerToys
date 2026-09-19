@@ -36,6 +36,7 @@ namespace NonLocalizable
     const wchar_t AllowChildWindowSnapID[] = L"fancyzones_allowChildWindowSnap";
     const wchar_t DisableRoundCornersOnSnapping[] = L"fancyzones_disableRoundCornersOnSnap";
     const wchar_t LinkedResizingID[] = L"fancyzones_linkedResize";
+    const wchar_t LinkedResizePreviewID[] = L"fancyzones_linkedResizePreview";
 
     const wchar_t SystemThemeID[] = L"fancyzones_systemTheme";
     const wchar_t ZoneColorID[] = L"fancyzones_zoneColor";
@@ -133,6 +134,7 @@ void FancyZonesSettings::LoadSettings()
         SetBoolFlag(values, NonLocalizable::AllowChildWindowSnapID, SettingId::AllowSnapChildWindows, m_settings.allowSnapChildWindows);
         SetBoolFlag(values, NonLocalizable::DisableRoundCornersOnSnapping, SettingId::DisableRoundCornersOnSnapping, m_settings.disableRoundCorners);
         SetBoolFlag(values, NonLocalizable::LinkedResizingID, SettingId::LinkedResizing, m_settings.linkedResizing);
+        SetBoolFlag(values, NonLocalizable::LinkedResizePreviewID, SettingId::LinkedResizePreview, m_settings.linkedResizePreview);
 
         // colors
         if (auto val = values.get_string_value(NonLocalizable::ZoneColorID))

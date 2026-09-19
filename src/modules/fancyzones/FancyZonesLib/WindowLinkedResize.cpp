@@ -9,6 +9,7 @@
 #include <FancyZonesLib/GridTracks.h>
 #include <FancyZonesLib/Layout.h>
 #include <FancyZonesLib/LinkedResizing.h>
+#include <FancyZonesLib/Settings.h>
 #include <FancyZonesLib/WindowUtils.h>
 #include <FancyZonesLib/WorkArea.h>
 
@@ -39,6 +40,7 @@ namespace
     // resized window active, and SWP_ASYNCWINDOWPOS keeps a hung or inaccessible
     // peer from blocking the gesture.
     constexpr UINT kApplyFlags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
+    constexpr UINT kDeferredApplyFlags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
 
     void ApplyRect(HWND window, const RECT& rect) noexcept
     {
@@ -47,16 +49,45 @@ namespace
             Logger::error(L"Linked resize: SetWindowPos failed, {}", get_last_error_or_default(GetLastError()));
         }
     }
+
+    bool AllowsTarget(HWND window, const std::optional<WindowSizeConstraints>& constraints, const RECT& target) noexcept
+    {
+        return !constraints.has_value() || !constraints->Matches(window) || constraints->Allows(target);
+    }
+
+    ZoneIndexSet ChangedZones(const ZonesMap& before, const ZonesMap& after)
+    {
+        ZoneIndexSet changed;
+        for (const auto& [id, zone] : after)
+        {
+            const auto prior = before.find(id);
+            if (prior == before.end())
+            {
+                changed.push_back(id);
+                continue;
+            }
+
+            const RECT priorRect = prior->second.GetZoneRect();
+            const RECT nextRect = zone.GetZoneRect();
+            if (!EqualRect(&priorRect, &nextRect))
+            {
+                changed.push_back(id);
+            }
+        }
+
+        return changed;
+    }
 }
 
-WindowLinkedResize::WindowLinkedResize(HWND window, const RECT& startRect, WorkArea* workArea, Layout* layout, ZoneIndexSet windowZones, const ZonesMap& startZones, int gap) :
+WindowLinkedResize::WindowLinkedResize(HWND window, const RECT& startRect, WorkArea* workArea, Layout* layout, ZoneIndexSet windowZones, const ZonesMap& startZones, int gap, bool previewMode) :
     m_window(window),
     m_startRect(startRect),
     m_workArea(workArea),
     m_layout(layout),
     m_windowZones(std::move(windowZones)),
     m_startZones(startZones),
-    m_gap(gap)
+    m_gap(gap),
+    m_previewMode(previewMode)
 {
 }
 
@@ -102,7 +133,15 @@ std::unique_ptr<WindowLinkedResize> WindowLinkedResize::Create(HWND window, cons
             continue;
         }
 
-        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window, startRect, workArea.get(), layout.get(), windowZones, layout->Zones(), layout->TrackSpacing()));
+        auto session = std::unique_ptr<WindowLinkedResize>(new WindowLinkedResize(window,
+                                                                                 startRect,
+                                                                                 workArea.get(),
+                                                                                 layout.get(),
+                                                                                 windowZones,
+                                                                                 layout->Zones(),
+                                                                                 layout->TrackSpacing(),
+                                                                                 FancyZonesSettings::settings().linkedResizePreview));
+        session->m_windowConstraints = assignedWindows.GetWindowSizeConstraints(window);
 
         for (const auto& [peer, peerZones] : assignedWindows.SnappedWindows())
         {
@@ -132,6 +171,7 @@ std::unique_ptr<WindowLinkedResize> WindowLinkedResize::Create(HWND window, cons
             }
 
             peerState.appliedRect = peerState.startRect;
+            peerState.constraints = assignedWindows.GetWindowSizeConstraints(peer);
             session->m_peers.push_back(std::move(peerState));
         }
 
@@ -187,10 +227,11 @@ void WindowLinkedResize::Update(HWND window) noexcept
         return;
     }
 
-    // The moved boundary lines are derived from the resized window's assigned
-    // zone set and the current effective zones, so every update starts from the
-    // map produced by the previous one.
-    const RECT combined = layout->GetCombinedZonesRect(m_windowZones);
+    // Live mode advances the effective layout on every update. Preview mode
+    // advances only its private candidate map, leaving every peer window and
+    // the persisted layout untouched until End().
+    const ZonesMap& currentZones = m_previewMode && m_previewZones.has_value() ? m_previewZones.value() : layout->Zones();
+    const RECT combined = Layout::CombinedZonesRect(currentZones, m_windowZones);
     if (!LinkedResizing::IsValidTargetRect(combined))
     {
         return;
@@ -207,7 +248,7 @@ void WindowLinkedResize::Update(HWND window) noexcept
 
     // Compose every selected track move on a copy of the effective map: a
     // rejected track leaves the previous layout and all peer rects unchanged.
-    ZonesMap movedZones = layout->Zones();
+    ZonesMap movedZones = currentZones;
     for (const auto& move : moves)
     {
         auto moved = move.horizontal
@@ -226,6 +267,12 @@ void WindowLinkedResize::Update(HWND window) noexcept
     // longer follow, or an invalid target, rejects the whole step so no window
     // is left behind by a mutated layout.
     HWND workAreaWindow = m_workArea->GetWorkAreaWindow();
+    const RECT activeTarget = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(m_window, Layout::CombinedZonesRect(movedZones, m_windowZones), workAreaWindow);
+    if (!LinkedResizing::IsValidTargetRect(activeTarget) || !AllowsTarget(m_window, m_windowConstraints, activeTarget))
+    {
+        return;
+    }
+
     std::vector<RECT> targets;
     std::vector<RECT> preStepRects;
     targets.reserve(m_peers.size());
@@ -238,13 +285,22 @@ void WindowLinkedResize::Update(HWND window) noexcept
         }
 
         const RECT target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(peer.window, Layout::CombinedZonesRect(movedZones, peer.zones), workAreaWindow);
-        if (!LinkedResizing::IsValidTargetRect(target))
+        if (!LinkedResizing::IsValidTargetRect(target) || !AllowsTarget(peer.window, peer.constraints, target))
         {
             return;
         }
 
         targets.push_back(target);
         preStepRects.push_back(peer.appliedRect);
+    }
+
+    if (m_previewMode)
+    {
+        m_previewZones = std::move(movedZones);
+        m_workArea->ShowZonesPreview(m_previewZones.value(), ChangedZones(m_startZones, m_previewZones.value()), m_window);
+        m_appliedDeltas = deltas;
+        m_layoutChanged = true;
+        return;
     }
 
     const ZonesMap priorZones = layout->Zones();
@@ -313,7 +369,15 @@ void WindowLinkedResize::End() noexcept
     {
         if (Layout* layout = CurrentLayout())
         {
-            if (IsWindow(m_window))
+            if (m_previewMode)
+            {
+                if (!CommitPreview(*layout))
+                {
+                    Release();
+                    return;
+                }
+            }
+            else if (IsWindow(m_window))
             {
                 const RECT target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(m_window, layout->GetCombinedZonesRect(m_windowZones), m_workArea->GetWorkAreaWindow());
                 RECT current{};
@@ -352,7 +416,128 @@ void WindowLinkedResize::Cancel() noexcept
         ApplyRect(peer.window, peer.startRect);
     }
 
+    if (m_previewMode && IsWindow(m_window))
+    {
+        ApplyRect(m_window, m_startRect);
+    }
+
     Release();
+}
+
+bool WindowLinkedResize::CommitPreview(Layout& layout) noexcept
+{
+    const auto rollback = [&]() noexcept {
+        layout.ReplaceZones(m_startZones);
+        if (IsWindow(m_window))
+        {
+            ApplyRect(m_window, m_startRect);
+        }
+        for (const auto& peer : m_peers)
+        {
+            if (IsWindow(peer.window))
+            {
+                ApplyRect(peer.window, peer.startRect);
+            }
+        }
+    };
+
+    if (!m_previewZones.has_value() || !m_workArea || !IsWindow(m_window))
+    {
+        rollback();
+        return false;
+    }
+
+    struct WindowTarget
+    {
+        HWND window{};
+        RECT target{};
+        const std::optional<WindowSizeConstraints>* constraints{};
+    };
+
+    const HWND workAreaWindow = m_workArea->GetWorkAreaWindow();
+    std::vector<WindowTarget> windows;
+    windows.reserve(m_peers.size() + 1);
+    windows.push_back(WindowTarget{
+        .window = m_window,
+        .target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(m_window, Layout::CombinedZonesRect(m_previewZones.value(), m_windowZones), workAreaWindow),
+        .constraints = &m_windowConstraints,
+    });
+    for (const auto& peer : m_peers)
+    {
+        windows.push_back(WindowTarget{
+            .window = peer.window,
+            .target = FancyZonesWindowUtils::AdjustRectForSizeWindowToRect(peer.window, Layout::CombinedZonesRect(m_previewZones.value(), peer.zones), workAreaWindow),
+            .constraints = &peer.constraints,
+        });
+    }
+
+    for (const auto& entry : windows)
+    {
+        if (!IsResizablePeer(entry.window) || !LinkedResizing::IsValidTargetRect(entry.target) ||
+            !AllowsTarget(entry.window, *entry.constraints, entry.target))
+        {
+            rollback();
+            return false;
+        }
+    }
+
+    if (!layout.ReplaceZones(m_previewZones.value()))
+    {
+        rollback();
+        return false;
+    }
+
+    HDWP deferred = BeginDeferWindowPos(static_cast<int>(windows.size()));
+    if (!deferred)
+    {
+        rollback();
+        return false;
+    }
+
+    for (const auto& entry : windows)
+    {
+        deferred = DeferWindowPos(deferred,
+                                  entry.window,
+                                  nullptr,
+                                  entry.target.left,
+                                  entry.target.top,
+                                  entry.target.right - entry.target.left,
+                                  entry.target.bottom - entry.target.top,
+                                  kDeferredApplyFlags);
+        if (!deferred)
+        {
+            Logger::error(L"Linked resize preview: failed to prepare deferred window positions");
+            rollback();
+            return false;
+        }
+    }
+
+    m_updating = true;
+    const bool applied = EndDeferWindowPos(deferred) != FALSE;
+    m_updating = false;
+    bool exact = applied;
+    for (const auto& entry : windows)
+    {
+        RECT actual{};
+        if (!GetWindowRect(entry.window, &actual) || !EqualRect(&actual, &entry.target))
+        {
+            exact = false;
+            break;
+        }
+    }
+
+    if (!exact)
+    {
+        Logger::warn(L"Linked resize preview: a window rejected its proposed size; restoring the previous layout");
+        rollback();
+        return false;
+    }
+
+    for (size_t i = 0; i < m_peers.size(); ++i)
+    {
+        m_peers[i].appliedRect = windows[i + 1].target;
+    }
+    return true;
 }
 
 void WindowLinkedResize::PersistAdjustedLayout(Layout& layout) noexcept
@@ -390,10 +575,16 @@ void WindowLinkedResize::PersistAdjustedLayout(Layout& layout) noexcept
 
 void WindowLinkedResize::Release() noexcept
 {
+    if (m_previewMode && m_workArea)
+    {
+        m_workArea->HideZones();
+    }
+
     m_peers.clear();
     m_window = nullptr;
     m_workArea = nullptr;
     m_layout = nullptr;
     m_windowZones.clear();
     m_startZones.clear();
+    m_previewZones.reset();
 }

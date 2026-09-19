@@ -6,6 +6,28 @@
 #include <FancyZonesLib/VirtualDesktop.h>
 #include <FancyZonesLib/WindowUtils.h>
 
+namespace
+{
+    constexpr UINT ConstraintQueryTimeoutMs = 40;
+}
+
+bool WindowSizeConstraints::Allows(const RECT& rect) const noexcept
+{
+    const LONG width = rect.right - rect.left;
+    const LONG height = rect.bottom - rect.top;
+    return width > 0 && height > 0 &&
+           width >= minimumTrackSize.cx && height >= minimumTrackSize.cy &&
+           width <= maximumTrackSize.cx && height <= maximumTrackSize.cy;
+}
+
+bool WindowSizeConstraints::Matches(HWND window) const noexcept
+{
+    DWORD currentProcessId{};
+    GetWindowThreadProcessId(window, &currentProcessId);
+    return IsWindow(window) && currentProcessId == processId && GetDpiForWindow(window) == dpi &&
+           GetWindowLongPtr(window, GWL_STYLE) == style && GetWindowLongPtr(window, GWL_EXSTYLE) == extendedStyle;
+}
+
 void LayoutAssignedWindows::Assign(HWND window, const ZoneIndexSet& zones)
 {
     Dismiss(window);
@@ -38,6 +60,8 @@ void LayoutAssignedWindows::Dismiss(HWND window)
         
         m_windowIndexSet.erase(window);
     }
+
+    m_windowSizeConstraints.erase(window);
     
     FancyZonesWindowProperties::SetTabSortKeyWithinZone(window, std::nullopt);
 }
@@ -56,6 +80,17 @@ ZoneIndexSet LayoutAssignedWindows::GetZoneIndexSetFromWindow(HWND window) const
     }
     
     return {};
+}
+
+std::optional<WindowSizeConstraints> LayoutAssignedWindows::GetWindowSizeConstraints(HWND window) const noexcept
+{
+    const auto it = m_windowSizeConstraints.find(window);
+    if (it == m_windowSizeConstraints.end() || !it->second.Matches(window))
+    {
+        return std::nullopt;
+    }
+
+    return it->second;
 }
 
 bool LayoutAssignedWindows::IsZoneEmpty(ZoneIndex zoneIndex) const noexcept
@@ -169,4 +204,50 @@ HWND LayoutAssignedWindows::GetNextZoneWindow(ZoneIndexSet indexSet, HWND curren
     {
         return iter == assignedWindows.begin() ? assignedWindows.back() : *(--iter);
     }
+}
+
+void LayoutAssignedWindows::RefreshWindowSizeConstraints(HWND window) noexcept
+{
+    if (!IsWindow(window))
+    {
+        return;
+    }
+
+    const UINT dpi = GetDpiForWindow(window);
+    MINMAXINFO info{};
+    info.ptMinTrackSize = {
+        GetSystemMetricsForDpi(SM_CXMINTRACK, dpi),
+        GetSystemMetricsForDpi(SM_CYMINTRACK, dpi),
+    };
+    info.ptMaxTrackSize = {
+        GetSystemMetricsForDpi(SM_CXMAXTRACK, dpi),
+        GetSystemMetricsForDpi(SM_CYMAXTRACK, dpi),
+    };
+
+    DWORD_PTR messageResult{};
+    if (!SendMessageTimeoutW(window,
+                             WM_GETMINMAXINFO,
+                             0,
+                             reinterpret_cast<LPARAM>(&info),
+                             SMTO_ABORTIFHUNG | SMTO_BLOCK,
+                             ConstraintQueryTimeoutMs,
+                             &messageResult))
+    {
+        return;
+    }
+
+    DWORD processId{};
+    GetWindowThreadProcessId(window, &processId);
+    m_windowSizeConstraints[window] = WindowSizeConstraints{
+        .minimumTrackSize = { max(1L, info.ptMinTrackSize.x), max(1L, info.ptMinTrackSize.y) },
+        // Maximum tracking sizes are not reliable when queried manually: the
+        // default values describe maximization on one monitor and can reject a
+        // legitimate FancyZones span across several monitors. Final readback
+        // still detects an application-specific maximum at commit time.
+        .maximumTrackSize = { LONG_MAX, LONG_MAX },
+        .processId = processId,
+        .dpi = dpi,
+        .style = GetWindowLongPtr(window, GWL_STYLE),
+        .extendedStyle = GetWindowLongPtr(window, GWL_EXSTYLE),
+    };
 }

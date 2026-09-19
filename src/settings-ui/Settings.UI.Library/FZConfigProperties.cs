@@ -37,6 +37,7 @@ namespace Microsoft.PowerToys.Settings.UI.Library
             FancyzonesOpenWindowOnActiveMonitor = new BoolProperty();
             FancyzonesRestoreSize = new BoolProperty();
             FancyzonesLinkedResize = new BoolProperty();
+            FancyzonesLinkedResizePreview = new BoolProperty();
             FancyzonesQuickLayoutSwitch = new BoolProperty(ConfigDefaults.DefaultFancyzonesQuickLayoutSwitch);
             FancyzonesFlashZonesOnQuickSwitch = new BoolProperty(ConfigDefaults.DefaultFancyzonesFlashZonesOnQuickSwitch);
             UseCursorposEditorStartupscreen = new BoolProperty(ConfigDefaults.DefaultUseCursorposEditorStartupscreen);
@@ -100,6 +101,9 @@ namespace Microsoft.PowerToys.Settings.UI.Library
 
         [JsonPropertyName("fancyzones_linkedResize")]
         public BoolProperty FancyzonesLinkedResize { get; set; }
+
+        [JsonPropertyName("fancyzones_linkedResizePreview")]
+        public BoolProperty FancyzonesLinkedResizePreview { get; set; }
 
         [JsonPropertyName("fancyzones_quickLayoutSwitch")]
         public BoolProperty FancyzonesQuickLayoutSwitch { get; set; }

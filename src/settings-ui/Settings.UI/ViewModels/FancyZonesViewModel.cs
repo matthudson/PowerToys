@@ -78,6 +78,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
             _openWindowOnActiveMonitor = Settings.Properties.FancyzonesOpenWindowOnActiveMonitor.Value;
             _restoreSize = Settings.Properties.FancyzonesRestoreSize.Value;
             _linkedResize = Settings.Properties.FancyzonesLinkedResize.Value;
+            _linkedResizePreview = Settings.Properties.FancyzonesLinkedResizePreview.Value;
             _quickLayoutSwitch = Settings.Properties.FancyzonesQuickLayoutSwitch.Value;
             _flashZonesOnQuickLayoutSwitch = Settings.Properties.FancyzonesFlashZonesOnQuickSwitch.Value;
             _useCursorPosEditorStartupScreen = Settings.Properties.UseCursorposEditorStartupscreen.Value;
@@ -167,6 +168,7 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
         private bool _spanZonesAcrossMonitors;
         private bool _restoreSize;
         private bool _linkedResize;
+        private bool _linkedResizePreview;
         private bool _quickLayoutSwitch;
         private bool _flashZonesOnQuickLayoutSwitch;
         private bool _useCursorPosEditorStartupScreen;
@@ -517,9 +519,26 @@ namespace Microsoft.PowerToys.Settings.UI.ViewModels
                     _linkedResize = value;
                     Settings.Properties.FancyzonesLinkedResize.Value = value;
                     NotifyPropertyChanged();
+                    NotifyPropertyChanged(nameof(LinkedResizePreviewAvailable));
                 }
             }
         }
+
+        public bool LinkedResizePreview
+        {
+            get => _linkedResizePreview;
+            set
+            {
+                if (value != _linkedResizePreview)
+                {
+                    _linkedResizePreview = value;
+                    Settings.Properties.FancyzonesLinkedResizePreview.Value = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        public bool LinkedResizePreviewAvailable => _linkedResize;
 
         public bool QuickLayoutSwitch
         {

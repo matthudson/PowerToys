@@ -176,6 +176,12 @@
                             <tkcontrols:SettingsCard Name="FancyZonesLinkedResize" ContentAlignment="Left">
                                 <ptcontrols:CheckBoxWithDescriptionControl x:Uid="FancyZones_LinkedResize" IsChecked="{x:Bind ViewModel.LinkedResize, Mode=TwoWay}" />
                             </tkcontrols:SettingsCard>
+                            <tkcontrols:SettingsCard
+                                Name="FancyZonesLinkedResizePreview"
+                                ContentAlignment="Left"
+                                IsEnabled="{x:Bind ViewModel.LinkedResizePreviewAvailable, Mode=OneWay}">
+                                <ptcontrols:CheckBoxWithDescriptionControl x:Uid="FancyZones_LinkedResizePreview" IsChecked="{x:Bind ViewModel.LinkedResizePreview, Mode=TwoWay}" />
+                            </tkcontrols:SettingsCard>
                             <tkcontrols:SettingsCard Name="FancyZonesMakeDraggedWindowTransparentCheckBoxControl" ContentAlignment="Left">
                                 <CheckBox x:Uid="FancyZones_MakeDraggedWindowTransparentCheckBoxControl" IsChecked="{x:Bind ViewModel.MakeDraggedWindowsTransparent, Mode=TwoWay}" />
                             </tkcontrols:SettingsCard>

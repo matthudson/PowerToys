@@ -315,6 +315,21 @@ namespace FancyZonesUnitTests
             CustomAssert::AreEqual(RECT{ 116, 0, 216, 100 }, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 1, 42 }));
             CustomAssert::AreEqual(RECT{}, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 42 }));
         }
+
+        TEST_METHOD (CombinedZonesRectPreservesSpanningWindowFootprintAcrossOtherZones)
+        {
+            // A window may be assigned to disjoint zones whose outer bounding
+            // rectangle also covers another zone. Linked resize treats that
+            // complete bounding rectangle as the HWND's target and constraint
+            // footprint; it must not independently size the selected zones.
+            ZonesMap zones;
+            zones.emplace(0, Zone(RECT{ 0, 0, 100, 100 }, 0));
+            zones.emplace(1, Zone(RECT{ 116, 0, 216, 100 }, 1));
+            zones.emplace(2, Zone(RECT{ 0, 116, 100, 216 }, 2));
+            zones.emplace(3, Zone(RECT{ 116, 116, 216, 216 }, 3));
+
+            CustomAssert::AreEqual(RECT{ 0, 0, 216, 216 }, Layout::CombinedZonesRect(zones, ZoneIndexSet{ 0, 3 }));
+        }
     };
 
     TEST_CLASS (LayoutInitUnitTests)

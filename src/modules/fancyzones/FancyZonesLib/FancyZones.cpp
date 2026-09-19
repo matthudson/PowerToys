@@ -218,7 +218,7 @@ struct FancyZones : public winrt::implements<FancyZones, IFancyZones, IFancyZone
 {
 public:
     FancyZones(HINSTANCE hinstance, std::function<void()> disableModuleCallbackFunction) noexcept :
-        SettingsObserver({ SettingId::EditorHotkey, SettingId::WindowSwitching, SettingId::PrevTabHotkey, SettingId::NextTabHotkey, SettingId::SpanZonesAcrossMonitors, SettingId::MonitorRotation, SettingId::MonitorRotationHotkey, SettingId::LinkedResizing }),
+        SettingsObserver({ SettingId::EditorHotkey, SettingId::WindowSwitching, SettingId::PrevTabHotkey, SettingId::NextTabHotkey, SettingId::SpanZonesAcrossMonitors, SettingId::MonitorRotation, SettingId::MonitorRotationHotkey, SettingId::LinkedResizing, SettingId::LinkedResizePreview }),
         m_hinstance(hinstance),
         m_draggingState([this]() {
             PostMessageW(m_window, WM_PRIV_LOCATIONCHANGE, NULL, NULL);
@@ -479,7 +479,10 @@ FancyZones::VirtualDesktopChanged() noexcept
 
 void FancyZones::MoveSizeStart(HWND window, HMONITOR monitor)
 {
-    m_windowLinkedResize = nullptr;
+    // A display-driver reset or interrupted shell gesture can omit the matching
+    // move-size end event. Roll back any abandoned session before starting a
+    // new one rather than silently dropping its uncommitted layout state.
+    AbortMoveSize();
     m_windowMouseSnapper = WindowMouseSnap::Create(window, m_workAreaConfiguration.GetAllWorkAreas(), m_notificationUtil.get());
     if (m_windowMouseSnapper)
     {
@@ -1630,9 +1633,11 @@ void FancyZones::SettingsUpdate(SettingId id)
     }
     break;
     case SettingId::LinkedResizing:
+    case SettingId::LinkedResizePreview:
     {
-        // Disabling the setting mid-gesture restores independent resize.
-        if (!FancyZonesSettings::settings().linkedResizing && m_windowLinkedResize)
+        // Changing either linked-resize mode mid-gesture restores the captured
+        // layout instead of mixing live and deferred behavior.
+        if (m_windowLinkedResize)
         {
             m_windowLinkedResize->Cancel();
             m_windowLinkedResize = nullptr;

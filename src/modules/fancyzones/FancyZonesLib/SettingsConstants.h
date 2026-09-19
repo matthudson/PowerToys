@@ -37,4 +37,5 @@ enum class SettingId
     AllowSnapChildWindows,
     DisableRoundCornersOnSnapping,
     LinkedResizing,
+    LinkedResizePreview,
 };
